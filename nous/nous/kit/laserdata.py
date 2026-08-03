@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 STREAM = os.environ.get("LASERDATA_STREAM", "nous")
 CONNECTION_STRING = os.environ.get("LASERDATA_URL", "")
+PUBLISH_TIMEOUT = float(os.environ.get("LASERDATA_TIMEOUT", "2"))
 
 
 async def _publish(payload: dict, topic: str) -> None:
@@ -51,10 +52,17 @@ def publish_event(payload: dict, topic: str) -> bool:
         if endpoint.hostname and endpoint.port:
             with socket.create_connection((endpoint.hostname, endpoint.port), timeout=0.25):
                 pass
-        asyncio.run(asyncio.wait_for(_publish(payload, topic), timeout=2.0))
+        asyncio.run(asyncio.wait_for(_publish(payload, topic), timeout=PUBLISH_TIMEOUT))
         event_id = payload.get("id", "event")
         print(f"   📡 LaserData {STREAM}/{topic} ← {event_id}")
         return True
     except Exception as exc:
-        print(f"   ⚠ LaserData unavailable ({type(exc).__name__}); continuing locally")
+        detail = str(exc).replace(CONNECTION_STRING, "<connection-redacted>")
+        if endpoint.password:
+            detail = detail.replace(endpoint.password, "<password-redacted>")
+        suffix = f": {detail}" if detail else ""
+        print(
+            f"   ⚠ LaserData unavailable ({type(exc).__name__}{suffix}); "
+            "continuing locally"
+        )
         return False
