@@ -13,7 +13,7 @@ from kit.feed import FREE_SLOTS, STORY
 
 
 class DashboardHandlerTest(unittest.TestCase):
-    dashboard_path = server.ROOT / "frontend" / "index.html"
+    dashboard_path = server.ROOT / "frontend" / "console.html"
 
     def test_dashboard_is_served_from_root(self):
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.H)
@@ -21,11 +21,25 @@ class DashboardHandlerTest(unittest.TestCase):
         thread.start()
 
         try:
-            with urlopen(f"http://127.0.0.1:{httpd.server_port}/") as response:
+            with urlopen(f"http://127.0.0.1:{httpd.server_port}/console") as response:
                 body = response.read().decode()
                 self.assertEqual(response.status, 200)
                 self.assertEqual(response.headers.get_content_type(), "text/html")
-                self.assertIn("<title>Nous — Personal brain</title>", body)
+                self.assertIn("Nous", body)
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+            thread.join()
+
+    def test_landing_page_is_served_at_root(self):
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.H)
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with urlopen(f"http://127.0.0.1:{httpd.server_port}/") as response:
+                body = response.read().decode()
+                self.assertEqual(response.status, 200)
+                self.assertIn("brainwrap", body)   # the landing hero
         finally:
             httpd.shutdown()
             httpd.server_close()
@@ -90,8 +104,10 @@ class DashboardHandlerTest(unittest.TestCase):
                 payload = json.loads(response.read())
 
             self.assertEqual(payload["goal"], "Visit Sam before chemo starts")
-            self.assertEqual(payload["slot"], FREE_SLOTS[0]["slot"])
+            self.assertTrue(payload["slot"])          # a real dated slot is proposed
             self.assertEqual(len(payload["plan"]), 3)
+            self.assertEqual(payload.get("status"), "proposed")
+            self.assertEqual(payload.get("person"), "Sam")
         finally:
             httpd.shutdown()
             httpd.server_close()

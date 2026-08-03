@@ -54,8 +54,9 @@ class H(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
 
     def do_GET(self):
-        if self.path in ("/", "/index.html"):
-            f = ROOT / "frontend" / "index.html"
+        if self.path in ("/", "/index.html", "/console", "/console.html"):
+            name = "console.html" if "console" in self.path else "index.html"
+            f = ROOT / "frontend" / name
             if f.exists():
                 self._send_html(f)
                 return
@@ -66,7 +67,12 @@ class H(BaseHTTPRequestHandler):
             m = brain.store.find_protocol(qs.get("trigger_class", [""])[0], qs.get("q", [""])[0])
             self._send(200, m or {"match": None})
         elif self.path == "/state":
-            self._send(200, {"scoreboard": brain.inbox.scoreboard(),
+            g = getattr(brain.store, "g", {})
+            self._send(200, {"commitments": list(g.get("commitments", {}).values()),
+                             "protocols": list(g.get("protocols", {}).values()),
+                             "contacts": list(g.get("contacts", {}).values()),
+                             "receipts": len(g.get("receipts", {})),
+                             "scoreboard": brain.inbox.scoreboard(),
                              "graph": brain.store.describe(),
                              "pending_queue": [e["id"] for e in brain.pending_queue],
                              "watching": (brain.watching or {}).get("id"),
@@ -79,8 +85,8 @@ class H(BaseHTTPRequestHandler):
         try:
             if self.path == "/events":
                 self._send(200, {"status": brain.ingest(b)})
-            elif self.path == "/goals":
-                self._send(200, brain.plan_goal(b.get("goal", "")))
+            elif self.path in ("/goals", "/promise"):
+                self._send(200, brain.plan_goal(b.get("goal") or b.get("text") or ""))
             elif self.path == "/actions/execute":
                 actor = "brain" if b.get("protocol") else "human"
                 r = brain.inbox.execute(b["event_id"], b["action"], b.get("params", {}), actor)

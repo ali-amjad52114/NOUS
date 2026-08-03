@@ -11,7 +11,7 @@ Two loops, one memory:
 """
 from __future__ import annotations
 
-from . import distill, feed, pipegen
+from . import distill, feed, parse, pipegen
 from .actions import Inbox
 from .memory import make_store
 
@@ -34,6 +34,36 @@ class Brain:
     def plan_goal(self, goal: str) -> dict:
         goal = " ".join(str(goal or "").split())
         assert goal, "goal is required"
+
+        # If this is a promise involving a real person, run the FULL commitment
+        # flow (parse who/what/when -> propose a dated slot -> Book It).
+        p = parse.parse_promise(goal)
+        if p["understood"]:
+            eid = f"said-{len(self.inbox.items) + 1}"
+            evt = {"id": eid, "type": "message_out", "channel": "you",
+                   "person": p["person"], "subject": "you said",
+                   "body": goal, "trigger_class": "promise_made"}
+            self.inbox.add(evt)
+            self.store.remember_event(feed.publish(evt))
+            c = self.store.save_commitment({
+                "person": p["person"], "promise": goal[:140],
+                "deadline_days": p["deadline_days"], "source_event": eid,
+                "activity": p["activity"]})
+            self.store.update_commitment(c["id"], status="proposed",
+                                         proposed_slot=p["proposed_slot"],
+                                         window_label=p["window_label"],
+                                         days_out=p["days_out"])
+            self.say(f"\U0001f91d PROMISE DETECTED — \u201c{goal}\u201d")
+            self.say(f"   \u2192 Commitment {c['id']}: {p['activity']} with {p['person']}, "
+                     f"{p['window_label']}. I won't let this one slip.")
+            self.say("   [guild] concierge session opened — awaiting owner decision:")
+            self.say(f"   \u25b6 You're free {p['proposed_slot']} — book {p['activity']} "
+                     f"with {p['person']}?   \u2192  approve {c['id']}")
+            return {"status": "proposed", "commitment_id": c["id"], "goal": goal,
+                    "plan": [f"Book {p['activity']} with {p['person']}",
+                             f"Send {p['person']} the confirmation",
+                             "Follow up if no reply in 2 days"],
+                    "slot": p["proposed_slot"], "days_out": p["days_out"], **p}
 
         personal = any(word in goal.lower() for word in ("visit", "meet", "call", "see "))
         plan = [
