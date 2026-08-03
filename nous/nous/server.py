@@ -24,6 +24,7 @@ from kit.brain import Brain  # noqa: E402
 
 brain = Brain()
 PORT = 7200
+ROOT = Path(__file__).resolve().parent
 
 
 class H(BaseHTTPRequestHandler):
@@ -38,12 +39,22 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b)
 
+    def _send_html(self, path):
+        b = path.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(b)))
+        self.end_headers()
+        self.wfile.write(b)
+
     def _body(self):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
 
     def do_GET(self):
-        if self.path.startswith("/memory/similar"):
+        if self.path == "/":
+            self._send_html(ROOT / "index.html")
+        elif self.path.startswith("/memory/similar"):
             from urllib.parse import parse_qs, urlparse
             qs = parse_qs(urlparse(self.path).query)
             m = brain.store.find_protocol(qs.get("trigger_class", [""])[0], qs.get("q", [""])[0])
