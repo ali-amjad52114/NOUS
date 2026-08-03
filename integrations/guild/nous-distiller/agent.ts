@@ -46,8 +46,11 @@ Return only valid JSON matching the required output schema. Preserve receipt ord
 action. Generalize item-specific values into $variables unless the value is a stable owner policy
 destination. Include protocol.approved equals true as a typed precondition. Every step must have
 a matching receipt_exists postcondition. Do not claim approval; the human owner remains final.
+The output trigger_class MUST exactly equal source_event.trigger_class. Derive name and
+signature_example from source_event; never copy invoice-specific example values unless the source
+event is actually an invoice.
 
-The exact output shape is:
+The exact output shape example below demonstrates structure only; its values are not defaults:
 {"name":"Handle incoming invoice","trigger_class":"incoming_invoice","signature_example":"invoice message with attachment","preconditions":[{"field":"protocol.approved","operator":"equals","value":true}],"steps":[{"action":"forward","params":{"to":"accounting@myfirm.com"}}],"postcondition":{"checks":[{"kind":"receipt_exists","action":"forward"}]},"risk":"low"}
 Do not add a protocol wrapper. Include every watched step and a matching postcondition check.
 
