@@ -176,13 +176,9 @@ button.ghostbtn:hover{border-color:var(--sage-soft);color:var(--ink);}
 <body>
 <main>
 <nav>
-  <div class="logo"><span id="logopulse">🧠</span> Nous</div>
-  <div class="navlinks">
-    <a href="#app">Live demo</a><a href="#app">Promises</a><a href="#app">Protocols</a>
-    <a href="/console">Console</a><a href="http://localhost:3000" target="_blank">Memory graph</a>
-  </div>
+  <div class="logo" style="background:transparent;border:none;box-shadow:none;font-size:22px;padding:0"><span id="logopulse">🧠</span> Nous</div>
+  
   <span class="sp"></span>
-  <a class="pill ghost" href="http://localhost:3000" target="_blank">Open memory</a>
   <a class="pill sage" href="#app" onclick="setTimeout(()=>document.getElementById('say').focus(),450)">Try Nous live</a>
 </nav>
 
@@ -204,7 +200,6 @@ button.ghostbtn:hover{border-color:var(--sage-soft);color:var(--ink);}
     </form>
     <div class="ctas">
       <a class="pill sage" href="/app">Open your brain →</a>
-      <a class="pill ghost" href="/console">Power console →</a>
       <a class="pill dark" href="http://localhost:3000" target="_blank">Memory graph →</a>
     </div>
   </div>
