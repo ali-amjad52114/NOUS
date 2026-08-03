@@ -10,6 +10,8 @@ import re
 import time
 from pathlib import Path
 
+from .laserdata import publish_event
+
 STATE = Path(__file__).resolve().parent.parent / "state"
 EVENTS_LOG = STATE / "events.jsonl"
 
@@ -66,5 +68,5 @@ def publish(evt: dict) -> dict:
     STATE.mkdir(exist_ok=True)
     with EVENTS_LOG.open("a") as f:
         f.write(json.dumps(evt) + "\n")
-    # VENUE TODO: laser.stream("brain").topic("life-events").publish().json(evt)
+    publish_event(evt, topic="life-events")
     return evt
