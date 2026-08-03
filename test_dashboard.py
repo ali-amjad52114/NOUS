@@ -13,6 +13,8 @@ from kit.feed import FREE_SLOTS, STORY
 
 
 class DashboardHandlerTest(unittest.TestCase):
+    dashboard_path = server.ROOT / "frontend" / "index.html"
+
     def test_dashboard_is_served_from_root(self):
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.H)
         thread = threading.Thread(target=httpd.serve_forever, daemon=True)
@@ -30,7 +32,7 @@ class DashboardHandlerTest(unittest.TestCase):
             thread.join()
 
     def test_dashboard_embeds_the_story_in_feed_order(self):
-        body = (server.ROOT / "index.html").read_text()
+        body = self.dashboard_path.read_text()
         match = re.search(
             r'<script id="story-data" type="application/json">(.*?)</script>',
             body,
@@ -41,14 +43,14 @@ class DashboardHandlerTest(unittest.TestCase):
         self.assertEqual(json.loads(match.group(1)), STORY)
 
     def test_dashboard_exposes_the_goal_planning_composer(self):
-        body = (server.ROOT / "index.html").read_text()
+        body = self.dashboard_path.read_text()
 
         self.assertIn('<form class="goal-composer" id="goal-form">', body)
         self.assertIn('name="goal"', body)
         self.assertIn('type="submit">Find the best time</button>', body)
 
     def test_dashboard_declares_the_required_action_contracts(self):
-        body = (server.ROOT / "index.html").read_text()
+        body = self.dashboard_path.read_text()
         match = re.search(
             r'<script id="action-contracts" type="application/json">(.*?)</script>',
             body,
