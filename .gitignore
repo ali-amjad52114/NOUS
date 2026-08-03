@@ -1,0 +1,4 @@
+.rocketride/
+__pycache__/
+*.pyc
+state/

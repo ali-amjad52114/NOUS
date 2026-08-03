@@ -1,0 +1,90 @@
+{
+  "_comment": "Auto-compiled by the personal brain from protocol P-001 ('Handle incoming invoice'), taught by Abhinav. Finalize node schema on the RocketRide VS Code canvas.",
+  "name": "brain-p-001",
+  "version": 1,
+  "source": {
+    "type": "webhook",
+    "path": "/protocol/P-001"
+  },
+  "nodes": [
+    {
+      "id": "trigger",
+      "type": "webhook",
+      "path": "/protocol/P-001",
+      "comment": "fires when an event of class 'incoming_invoice' arrives"
+    },
+    {
+      "id": "preconditions",
+      "type": "http",
+      "method": "POST",
+      "url": "http://127.0.0.1:7200/actions/preconditions",
+      "comment": "verify every typed precondition before touching anything"
+    },
+    {
+      "id": "step1_forward",
+      "type": "http",
+      "method": "POST",
+      "url": "http://127.0.0.1:7200/actions/execute",
+      "body": {
+        "action": "forward",
+        "params": {
+          "to": "accounting@myfirm.com"
+        },
+        "protocol": "P-001"
+      }
+    },
+    {
+      "id": "step2_label",
+      "type": "http",
+      "method": "POST",
+      "url": "http://127.0.0.1:7200/actions/execute",
+      "body": {
+        "action": "label",
+        "params": {
+          "name": "invoices"
+        },
+        "protocol": "P-001"
+      }
+    },
+    {
+      "id": "step3_archive",
+      "type": "http",
+      "method": "POST",
+      "url": "http://127.0.0.1:7200/actions/execute",
+      "body": {
+        "action": "archive",
+        "params": {},
+        "protocol": "P-001"
+      }
+    },
+    {
+      "id": "verify",
+      "type": "http",
+      "method": "POST",
+      "url": "http://127.0.0.1:7200/actions/verify",
+      "comment": "item is forwarded and archived; receipt recorded"
+    }
+  ],
+  "lanes": [
+    [
+      "trigger",
+      "preconditions"
+    ],
+    [
+      "preconditions",
+      "step1_forward"
+    ],
+    [
+      "step1_forward",
+      "step2_label"
+    ],
+    [
+      "step2_label",
+      "step3_archive"
+    ],
+    [
+      "step3_archive",
+      "verify"
+    ]
+  ]
+}

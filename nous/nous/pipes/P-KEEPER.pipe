@@ -1,0 +1,77 @@
+{
+  "_comment": "Auto-compiled by the personal brain from protocol P-KEEPER ('Keep a promise'), taught by Abhinav. Finalize node schema on the RocketRide VS Code canvas.",
+  "name": "brain-p-keeper",
+  "version": 1,
+  "source": {
+    "type": "webhook",
+    "path": "/protocol/P-KEEPER"
+  },
+  "nodes": [
+    {
+      "id": "trigger",
+      "type": "webhook",
+      "path": "/protocol/P-KEEPER",
+      "comment": "fires when an event of class 'promise_made' arrives"
+    },
+    {
+      "id": "preconditions",
+      "type": "http",
+      "method": "POST",
+      "url": "http://127.0.0.1:7200/actions/preconditions",
+      "comment": "verify every typed precondition before touching anything"
+    },
+    {
+      "id": "step1_book",
+      "type": "http",
+      "method": "POST",
+      "url": "http://127.0.0.1:7200/actions/execute",
+      "body": {
+        "action": "book",
+        "params": {
+          "slot": "$slot",
+          "with_person": "$person"
+        },
+        "protocol": "P-KEEPER"
+      }
+    },
+    {
+      "id": "step2_send_message",
+      "type": "http",
+      "method": "POST",
+      "url": "http://127.0.0.1:7200/actions/execute",
+      "body": {
+        "action": "send_message",
+        "params": {
+          "to": "$person",
+          "text": "$proposal"
+        },
+        "protocol": "P-KEEPER"
+      }
+    },
+    {
+      "id": "verify",
+      "type": "http",
+      "method": "POST",
+      "url": "http://127.0.0.1:7200/actions/verify",
+      "comment": "calendar hold exists + message delivered + follow-up scheduled"
+    }
+  ],
+  "lanes": [
+    [
+      "trigger",
+      "preconditions"
+    ],
+    [
+      "preconditions",
+      "step1_book"
+    ],
+    [
+      "step1_book",
+      "step2_send_message"
+    ],
+    [
+      "step2_send_message",
+      "verify"
+    ]
+  ]
+}
