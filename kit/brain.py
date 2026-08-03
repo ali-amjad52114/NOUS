@@ -31,6 +31,31 @@ class Brain:
         self.log.append(msg)
         print(msg)
 
+    def plan_goal(self, goal: str) -> dict:
+        goal = " ".join(str(goal or "").split())
+        assert goal, "goal is required"
+
+        personal = any(word in goal.lower() for word in ("visit", "meet", "call", "see "))
+        plan = [
+            "Clarify the outcome and who is involved",
+            "Check travel, preparation, and coordination needs",
+            "Reserve the time and send a confirmation",
+        ] if personal else [
+            "Define what done looks like",
+            "Gather what you need and clear the first blocker",
+            "Protect a focused time block and start",
+        ]
+        slot = min(
+            (slot for slot in feed.FREE_SLOTS if slot["days_out"] <= DEADLINE_DAYS),
+            key=lambda item: item["days_out"],
+        )
+        result = {"goal": goal, "plan": plan, "slot": slot["slot"],
+                  "days_out": slot["days_out"]}
+        self.say(f"🎯 GOAL RECEIVED — \"{goal}\"")
+        self.say(f"🧭 PLAN READY — {' → '.join(plan)}")
+        self.say(f"🗓 BEST SLOT — {slot['slot']} (day {slot['days_out']} of {DEADLINE_DAYS})")
+        return result
+
     # ---------------------------------------------------------------- ingest
     def ingest(self, evt: dict) -> str:
         evt = feed.publish(evt)

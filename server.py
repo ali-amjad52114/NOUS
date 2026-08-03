@@ -6,6 +6,7 @@ call back into /actions/execute so the ENGINE is the execution path.
     python3 server.py          # -> http://127.0.0.1:7200
 
   POST /events            {event json}           -> brain ingests (watch/refuse/act)
+  POST /goals             {goal}                 -> plan goal + choose best free slot
   GET  /memory/similar    ?trigger_class=&q=     -> best matching protocol
   POST /actions/execute   {event_id, action, params, protocol?} -> allowlisted execution
   POST /actions/preconditions | /actions/verify  -> pipeline check hooks
@@ -24,6 +25,7 @@ from kit.brain import Brain  # noqa: E402
 
 brain = Brain()
 PORT = 7200
+ROOT = Path(__file__).resolve().parent
 
 
 class H(BaseHTTPRequestHandler):
@@ -39,20 +41,23 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b)
 
+    def _send_html(self, path):
+        b = path.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(b)))
+        self.end_headers()
+        self.wfile.write(b)
+
     def _body(self):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
 
     def do_GET(self):
         if self.path in ("/", "/index.html"):
-            f = Path(__file__).resolve().parent / "frontend" / "index.html"
+            f = ROOT / "frontend" / "index.html"
             if f.exists():
-                b = f.read_bytes()
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(b)))
-                self.end_headers()
-                self.wfile.write(b)
+                self._send_html(f)
                 return
             self._send(404, {"error": "frontend/index.html not found"})
         elif self.path.startswith("/memory/similar"):
@@ -74,6 +79,8 @@ class H(BaseHTTPRequestHandler):
         try:
             if self.path == "/events":
                 self._send(200, {"status": brain.ingest(b)})
+            elif self.path == "/goals":
+                self._send(200, brain.plan_goal(b.get("goal", "")))
             elif self.path == "/actions/execute":
                 actor = "brain" if b.get("protocol") else "human"
                 r = brain.inbox.execute(b["event_id"], b["action"], b.get("params", {}), actor)
