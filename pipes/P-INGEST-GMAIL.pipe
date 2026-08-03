@@ -1,0 +1,103 @@
+{
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "webhook"
+      },
+      "ui": { "position": { "x": 20, "y": 180 } }
+    },
+    {
+      "id": "agent_rocketride_1",
+      "provider": "agent_rocketride",
+      "config": {
+        "agent_description": "Nous Gmail ingest: Guild reads mail, RocketRide publishes to LaserData.",
+        "instructions": [
+          "You orchestrate Gmail ingest for Nous. Do not detect commitments. Do not call FalkorDB. Do not send email.",
+          "1) Parse the webhook payload for correlation_id and optional message_id/query. If correlation_id is missing, create one UUID and keep it forever.",
+          "2) Call tool_guild (nous-gmail-reader) with {correlation_id, message_id?, query?} to retrieve ONE real Gmail message and the normalized event.",
+          "3) Ensure normalized JSON has: event_id, correlation_id, source=gmail, source_id, sender, recipients, subject, text, timestamp. event_id must be stable from Gmail message id (gmail:<id>).",
+          "4) Deduplicate: recall LaserData namespace nous:life-events for that event_id. If already remembered, return {\"status\":\"duplicate_skipped\",\"event_id\":...,\"correlation_id\":...} and stop.",
+          "5) Otherwise remember the normalized event JSON via tool_laserdata_memory.",
+          "6) Return JSON only: {\"status\":\"published\",\"event\":{...normalized...},\"laserdata\":{\"namespace\":\"nous:life-events\",\"action\":\"remember\"},\"correlation_id\":...}."
+        ],
+        "max_waves": 8,
+        "parameters": {}
+      },
+      "input": [{ "lane": "questions", "from": "webhook_1" }],
+      "ui": { "position": { "x": 260, "y": 180 } }
+    },
+    {
+      "id": "llm_openai_1",
+      "provider": "llm_openai",
+      "config": {
+        "profile": "openai-4o-mini",
+        "openai-4o-mini": { "apikey": "${ROCKETRIDE_OPENAI_KEY}" },
+        "parameters": {}
+      },
+      "control": [{ "classType": "llm", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 260, "y": 20 } }
+    },
+    {
+      "id": "memory_internal_1",
+      "provider": "memory_internal",
+      "config": { "type": "memory_internal" },
+      "control": [{ "classType": "memory", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 260, "y": 340 } }
+    },
+    {
+      "id": "tool_guild_1",
+      "provider": "tool_guild",
+      "config": {
+        "type": "tool_guild",
+        "baseUrl": "https://app.guild.ai",
+        "apiKeyId": "${GUILD_API_KEY_ID}",
+        "apiKeySecret": "${GUILD_API_KEY_SECRET}",
+        "owner": "${GUILD_WORKSPACE_OWNER}",
+        "workspace": "${GUILD_WORKSPACE_NAME}",
+        "agent": "nous-gmail-reader",
+        "resultMode": "wait",
+        "timeout": 300,
+        "maxSessions": 5,
+        "verifyTls": true
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 480, "y": 60 } }
+    },
+    {
+      "id": "tool_laserdata_memory_1",
+      "provider": "tool_laserdata_memory",
+      "config": {
+        "type": "tool_laserdata_memory",
+        "profile": "cloud",
+        "cloud": {
+          "connection_string": "${LASER_CONNECTION_STRING}",
+          "namespace": "nous:life-events",
+          "show_advanced": true,
+          "stream": "nous",
+          "allow_namespace_override": false,
+          "folded": true,
+          "recall_limit": 20,
+          "op_timeout": 30
+        }
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 480, "y": 260 } }
+    },
+    {
+      "id": "response_answers_1",
+      "provider": "response_answers",
+      "config": { "laneName": "result" },
+      "input": [{ "lane": "answers", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 700, "y": 180 } }
+    }
+  ],
+  "description": "Guild Gmail OAuth → normalize → LaserData publish (RocketRide orchestrates)",
+  "project_id": "c70d680e-8ebe-4914-8ced-6a3633e0f35c",
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "version": 1
+}

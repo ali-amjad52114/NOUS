@@ -1,0 +1,145 @@
+{
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "webhook"
+      },
+      "ui": { "position": { "x": 20, "y": 200 } }
+    },
+    {
+      "id": "guardrails_1",
+      "provider": "guardrails",
+      "config": {
+        "profile": "strict",
+        "strict": {
+          "policy_mode": "block",
+          "max_tokens_estimate": 8000,
+          "expected_format": "json"
+        }
+      },
+      "input": [{ "lane": "questions", "from": "webhook_1" }],
+      "ui": { "position": { "x": 200, "y": 200 } }
+    },
+    {
+      "id": "agent_rocketride_1",
+      "provider": "agent_rocketride",
+      "config": {
+        "agent_description": "Nous Distiller: watched actions → parameterized Protocol. Pending only. No execution.",
+        "instructions": [
+          "You distill ONE watched handling session into a reusable Protocol. Never execute actions. Never create calendar events. Never send email/Slack. Never arm a protocol.",
+          "Input JSON: {correlation_id, event_id?, watched:[{action,params}], event?}",
+          "1) Hold input in memory_internal. Keep correlation_id forever; create UUID only if missing.",
+          "2) Allowed actions ONLY: forward|label|archive|reply|book|send_message. Drop/reject any other action.",
+          "3) Call tool_guild agent nous-distiller with: source_event {id, trigger_class, fields}, watched_receipts (1-based order), allowed_actions (full allowlist), owner_id.",
+          "4) Expect a Protocol JSON: name, trigger_class, signature_example, preconditions (must include protocol.approved equals true), steps[{action,params}], postcondition.checks[{kind:receipt_exists,action}], risk.",
+          "5) Parameterize one-off entity values as $variables. Stable owner policy destinations (e.g. accounting@myfirm.com) and stable labels (e.g. invoices) may remain.",
+          "6) Write FalkorDB personal_brain with allow_writes: MERGE (:Protocol {id}) SET status='PENDING', approved=false, critic_verdict=null, steps_json, trigger_class, correlation_id. Link LEARNED_FROM Event if event_id present. Do NOT set approved=true.",
+          "7) Optionally remember protocol summary via tool_laserdata_memory (namespace nous:protocols or nous:life-events).",
+          "8) Return JSON only: {\"status\":\"pending_review\",\"protocol\":{...},\"correlation_id\":\"...\"}."
+        ],
+        "max_waves": 12,
+        "parameters": {}
+      },
+      "input": [{ "lane": "questions", "from": "guardrails_1" }],
+      "ui": { "position": { "x": 420, "y": 200 } }
+    },
+    {
+      "id": "llm_openai_1",
+      "provider": "llm_openai",
+      "config": {
+        "profile": "openai-4o-mini",
+        "openai-4o-mini": { "apikey": "${ROCKETRIDE_OPENAI_KEY}" },
+        "parameters": {}
+      },
+      "control": [
+        { "classType": "llm", "from": "agent_rocketride_1" },
+        { "classType": "llm", "from": "graph_falkordb_1" }
+      ],
+      "ui": { "position": { "x": 420, "y": 20 } }
+    },
+    {
+      "id": "memory_internal_1",
+      "provider": "memory_internal",
+      "config": { "type": "memory_internal" },
+      "control": [{ "classType": "memory", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 420, "y": 380 } }
+    },
+    {
+      "id": "tool_guild_1",
+      "provider": "tool_guild",
+      "config": {
+        "type": "tool_guild",
+        "baseUrl": "https://app.guild.ai",
+        "apiKeyId": "${GUILD_API_KEY_ID}",
+        "apiKeySecret": "${GUILD_API_KEY_SECRET}",
+        "owner": "${GUILD_WORKSPACE_OWNER}",
+        "workspace": "${GUILD_WORKSPACE_NAME}",
+        "agent": "nous-distiller",
+        "resultMode": "wait",
+        "timeout": 300,
+        "maxSessions": 5,
+        "verifyTls": true
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 660, "y": 40 } }
+    },
+    {
+      "id": "graph_falkordb_1",
+      "provider": "graph_falkordb",
+      "config": {
+        "type": "graph_falkordb",
+        "host": "${FALKOR_HOST}",
+        "port": 6379,
+        "username": "${FALKOR_USERNAME}",
+        "password": "${FALKOR_PASSWORD}",
+        "tls": false,
+        "graph": "personal_brain",
+        "db_description": "Nous personal brain: Protocol PENDING (not armed), Event, Person. Edges: LEARNED_FROM, HANDLES, TAUGHT_BY.",
+        "allow_writes": true,
+        "allow_execute": true,
+        "max_attempts": 5,
+        "max_rows": 250,
+        "max_execute_rows": 25000,
+        "query_timeout_ms": 30000
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 660, "y": 200 } }
+    },
+    {
+      "id": "tool_laserdata_memory_1",
+      "provider": "tool_laserdata_memory",
+      "config": {
+        "type": "tool_laserdata_memory",
+        "profile": "cloud",
+        "cloud": {
+          "connection_string": "${LASER_CONNECTION_STRING}",
+          "namespace": "nous:life-events",
+          "show_advanced": true,
+          "stream": "nous",
+          "allow_namespace_override": true,
+          "folded": true,
+          "recall_limit": 20,
+          "op_timeout": 30
+        }
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 660, "y": 360 } }
+    },
+    {
+      "id": "response_answers_1",
+      "provider": "response_answers",
+      "config": { "laneName": "result" },
+      "input": [{ "lane": "answers", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 900, "y": 200 } }
+    }
+  ],
+  "description": "Watched actions → Guild Distiller → Protocol PENDING in FalkorDB (not armed, no execute)",
+  "project_id": "a11c0d15-7110-4b2e-9f01-d15a71000001",
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "version": 1
+}

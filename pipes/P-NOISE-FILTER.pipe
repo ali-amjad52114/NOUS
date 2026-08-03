@@ -1,0 +1,83 @@
+{
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "webhook"
+      },
+      "ui": { "position": { "x": 20, "y": 180 } }
+    },
+    {
+      "id": "agent_rocketride_1",
+      "provider": "agent_rocketride",
+      "config": {
+        "agent_description": "Nous noise filter for fyi_noise. No commitments. No Guild critic.",
+        "instructions": [
+          "You classify and ignore FYI/noise life events. Do not create commitments. Do not call Guild. Do not book or send messages.",
+          "Input: normalized event with trigger_class preferably fyi_noise, plus correlation_id/event_id.",
+          "1) If trigger_class is not fyi_noise, still treat as noise only if clearly newsletter/briefing; else return {\"status\":\"skipped\",\"reason\":\"not_noise\"}.",
+          "2) Remember classification via tool_laserdata_memory namespace nous:life-events: {event_id, trigger_class:fyi_noise, status:ignored, correlation_id}.",
+          "3) Optional: if payload asks for archive_label, note label 'noise' in the published record only — do not call external mail APIs.",
+          "4) Return JSON only: {\"status\":\"ignored\",\"event_id\":\"...\",\"correlation_id\":\"...\"}."
+        ],
+        "max_waves": 6,
+        "parameters": {}
+      },
+      "input": [{ "lane": "questions", "from": "webhook_1" }],
+      "ui": { "position": { "x": 260, "y": 180 } }
+    },
+    {
+      "id": "llm_openai_1",
+      "provider": "llm_openai",
+      "config": {
+        "profile": "openai-4o-mini",
+        "openai-4o-mini": { "apikey": "${ROCKETRIDE_OPENAI_KEY}" },
+        "parameters": {}
+      },
+      "control": [{ "classType": "llm", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 260, "y": 20 } }
+    },
+    {
+      "id": "memory_internal_1",
+      "provider": "memory_internal",
+      "config": { "type": "memory_internal" },
+      "control": [{ "classType": "memory", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 260, "y": 340 } }
+    },
+    {
+      "id": "tool_laserdata_memory_1",
+      "provider": "tool_laserdata_memory",
+      "config": {
+        "type": "tool_laserdata_memory",
+        "profile": "cloud",
+        "cloud": {
+          "connection_string": "${LASER_CONNECTION_STRING}",
+          "namespace": "nous:life-events",
+          "show_advanced": true,
+          "stream": "nous",
+          "allow_namespace_override": false,
+          "folded": true,
+          "recall_limit": 20,
+          "op_timeout": 30
+        }
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 480, "y": 180 } }
+    },
+    {
+      "id": "response_answers_1",
+      "provider": "response_answers",
+      "config": { "laneName": "result" },
+      "input": [{ "lane": "answers", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 700, "y": 180 } }
+    }
+  ],
+  "description": "fyi_noise → LaserData classification publish → ignored (no commitments/Guild)",
+  "project_id": "a11c0d15-7110-4b2e-9f01-d15a71000006",
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "version": 1
+}

@@ -1,0 +1,125 @@
+{
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "webhook"
+      },
+      "ui": { "position": { "x": 20, "y": 200 } }
+    },
+    {
+      "id": "guardrails_1",
+      "provider": "guardrails",
+      "config": {
+        "profile": "strict",
+        "strict": {
+          "policy_mode": "block",
+          "max_tokens_estimate": 4000,
+          "expected_format": "json"
+        }
+      },
+      "input": [{ "lane": "questions", "from": "webhook_1" }],
+      "ui": { "position": { "x": 200, "y": 200 } }
+    },
+    {
+      "id": "agent_rocketride_1",
+      "provider": "agent_rocketride",
+      "config": {
+        "agent_description": "Nous receipt verifier: read-mostly FalkorDB/LaserData check. No external writes.",
+        "instructions": [
+          "You verify that expected actions produced receipts. Read-mostly. Do not execute actions. Do not create calendar events.",
+          "Input: {event_id|commitment_id|protocol_id, correlation_id, expected_actions:[]}.",
+          "1) Normalize expected_actions to a list of action names.",
+          "2) Query FalkorDB personal_brain for Receipt nodes linked to the given event_id / commitment_id / protocol_id (edges RAN/ON/PRODUCED as available).",
+          "3) Also recall tool_laserdata_memory namespace nous:receipts for matching event_id/protocol_id/correlation_id.",
+          "4) found = actions present in receipts; missing = expected_actions not found.",
+          "5) ok = missing is empty.",
+          "6) allow_writes is false on graph — do not write unless absolutely required; prefer read-only MATCH queries.",
+          "7) Return JSON only: {\"ok\":boolean,\"missing\":[],\"found\":[],\"correlation_id\":\"...\"}."
+        ],
+        "max_waves": 8,
+        "parameters": {}
+      },
+      "input": [{ "lane": "questions", "from": "guardrails_1" }],
+      "ui": { "position": { "x": 420, "y": 200 } }
+    },
+    {
+      "id": "llm_openai_1",
+      "provider": "llm_openai",
+      "config": {
+        "profile": "openai-4o-mini",
+        "openai-4o-mini": { "apikey": "${ROCKETRIDE_OPENAI_KEY}" },
+        "parameters": {}
+      },
+      "control": [
+        { "classType": "llm", "from": "agent_rocketride_1" },
+        { "classType": "llm", "from": "graph_falkordb_1" }
+      ],
+      "ui": { "position": { "x": 420, "y": 20 } }
+    },
+    {
+      "id": "memory_internal_1",
+      "provider": "memory_internal",
+      "config": { "type": "memory_internal" },
+      "control": [{ "classType": "memory", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 420, "y": 380 } }
+    },
+    {
+      "id": "graph_falkordb_1",
+      "provider": "graph_falkordb",
+      "config": {
+        "type": "graph_falkordb",
+        "host": "${FALKOR_HOST}",
+        "port": 6379,
+        "username": "${FALKOR_USERNAME}",
+        "password": "${FALKOR_PASSWORD}",
+        "tls": false,
+        "graph": "personal_brain",
+        "db_description": "Read Receipt, Event, Protocol, Commitment links for verification.",
+        "allow_writes": false,
+        "allow_execute": true,
+        "max_attempts": 5,
+        "max_rows": 250,
+        "max_execute_rows": 25000,
+        "query_timeout_ms": 30000
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 660, "y": 120 } }
+    },
+    {
+      "id": "tool_laserdata_memory_1",
+      "provider": "tool_laserdata_memory",
+      "config": {
+        "type": "tool_laserdata_memory",
+        "profile": "cloud",
+        "cloud": {
+          "connection_string": "${LASER_CONNECTION_STRING}",
+          "namespace": "nous:receipts",
+          "show_advanced": true,
+          "stream": "nous",
+          "allow_namespace_override": true,
+          "folded": true,
+          "recall_limit": 50,
+          "op_timeout": 30
+        }
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 660, "y": 300 } }
+    },
+    {
+      "id": "response_answers_1",
+      "provider": "response_answers",
+      "config": { "laneName": "result" },
+      "input": [{ "lane": "answers", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 900, "y": 200 } }
+    }
+  ],
+  "description": "Verify expected action receipts via FalkorDB + LaserData (read-mostly)",
+  "project_id": "a11c0d15-7110-4b2e-9f01-d15a71000005",
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "version": 1
+}

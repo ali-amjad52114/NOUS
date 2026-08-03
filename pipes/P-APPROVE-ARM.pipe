@@ -1,0 +1,123 @@
+{
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "webhook"
+      },
+      "ui": { "position": { "x": 20, "y": 200 } }
+    },
+    {
+      "id": "guardrails_1",
+      "provider": "guardrails",
+      "config": {
+        "profile": "strict",
+        "strict": {
+          "policy_mode": "block",
+          "max_tokens_estimate": 4000,
+          "expected_format": "json"
+        }
+      },
+      "input": [{ "lane": "questions", "from": "webhook_1" }],
+      "ui": { "position": { "x": 200, "y": 200 } }
+    },
+    {
+      "id": "agent_rocketride_1",
+      "provider": "agent_rocketride",
+      "config": {
+        "agent_description": "Nous human arm gate: approve→ARMED in FalkorDB only. No external side effects.",
+        "instructions": [
+          "You are the human approval arming gate. Input MUST be only {protocol_id, approved:true|false} plus optional correlation_id.",
+          "1) If approved is not strictly true (boolean true or string 'true' only if unavoidable), return JSON {\"status\":\"rejected\",\"reason\":\"not_approved\",\"protocol_id\":...} and stop. Do not mutate graph.",
+          "2) Load Protocol from FalkorDB personal_brain. Prefer protocols with critic_verdict=APPROVE_ELIGIBLE. If missing, return rejected reason unknown_protocol.",
+          "3) On approved===true: SET Protocol approved=true, status='ARMED', approved_ts=now. MERGE (:Protocol)-[:APPROVED_BY]->(:Person {name:'owner'}).",
+          "4) Publish an arming receipt/event via tool_laserdata_memory namespace nous:receipts: {protocol_id, status:armed, correlation_id?, ts}.",
+          "5) Never execute forward/label/archive/book/send_message. Never call calendar. Never send Slack/email.",
+          "6) Return JSON only: {\"status\":\"armed\",\"protocol_id\":\"...\",\"correlation_id\":\"...\"}."
+        ],
+        "max_waves": 8,
+        "parameters": {}
+      },
+      "input": [{ "lane": "questions", "from": "guardrails_1" }],
+      "ui": { "position": { "x": 420, "y": 200 } }
+    },
+    {
+      "id": "llm_openai_1",
+      "provider": "llm_openai",
+      "config": {
+        "profile": "openai-4o-mini",
+        "openai-4o-mini": { "apikey": "${ROCKETRIDE_OPENAI_KEY}" },
+        "parameters": {}
+      },
+      "control": [
+        { "classType": "llm", "from": "agent_rocketride_1" },
+        { "classType": "llm", "from": "graph_falkordb_1" }
+      ],
+      "ui": { "position": { "x": 420, "y": 20 } }
+    },
+    {
+      "id": "memory_internal_1",
+      "provider": "memory_internal",
+      "config": { "type": "memory_internal" },
+      "control": [{ "classType": "memory", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 420, "y": 380 } }
+    },
+    {
+      "id": "graph_falkordb_1",
+      "provider": "graph_falkordb",
+      "config": {
+        "type": "graph_falkordb",
+        "host": "${FALKOR_HOST}",
+        "port": 6379,
+        "username": "${FALKOR_USERNAME}",
+        "password": "${FALKOR_PASSWORD}",
+        "tls": false,
+        "graph": "personal_brain",
+        "db_description": "Arm Protocol nodes only: approved=true status=ARMED.",
+        "allow_writes": true,
+        "allow_execute": true,
+        "max_attempts": 5,
+        "max_rows": 250,
+        "max_execute_rows": 25000,
+        "query_timeout_ms": 30000
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 660, "y": 120 } }
+    },
+    {
+      "id": "tool_laserdata_memory_1",
+      "provider": "tool_laserdata_memory",
+      "config": {
+        "type": "tool_laserdata_memory",
+        "profile": "cloud",
+        "cloud": {
+          "connection_string": "${LASER_CONNECTION_STRING}",
+          "namespace": "nous:receipts",
+          "show_advanced": true,
+          "stream": "nous",
+          "allow_namespace_override": false,
+          "folded": true,
+          "recall_limit": 20,
+          "op_timeout": 30
+        }
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 660, "y": 300 } }
+    },
+    {
+      "id": "response_answers_1",
+      "provider": "response_answers",
+      "config": { "laneName": "result" },
+      "input": [{ "lane": "answers", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 900, "y": 200 } }
+    }
+  ],
+  "description": "Human approve gate → Protocol ARMED in FalkorDB + LaserData receipts publish",
+  "project_id": "a11c0d15-7110-4b2e-9f01-d15a71000004",
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "version": 1
+}
