@@ -36,6 +36,22 @@ now; `MEMORY_BACKEND=falkor` + docker + `pip install falkordb` flips on the
 real graph, browser at :3000. Judge query:
 `MATCH (p:Protocol)-[r]->(x) RETURN p, r, x`
 
+### Live Gmail + Google Calendar (optional hackathon connector)
+
+Create a Google Desktop OAuth client with Gmail API and Calendar API enabled,
+save it as `client_secret.json`, then run:
+
+```bash
+pip install -r requirements-data.txt
+python3 integrations/google_live.py --watch 10
+```
+
+For privacy, this reads only Gmail messages matching `NOUS` and Calendar
+events whose title contains `NOUS`. Override with `GOOGLE_GMAIL_QUERY` or
+`GOOGLE_CALENDAR_MARKER`. OAuth credentials and processed IDs stay in the
+ignored `state/` directory. Each new item is published to LaserData's
+`nous/life-events` topic and forwarded to the local NOUS API on port 7200.
+
 **Person 3 — Guild + RocketRide (the prize lane):**
 - Guild: publish two agents from `kit/distill.py`'s roles — Distiller + Safety
   Critic (`guild agent init --template LLM`, paste the prompts, `guild agent
