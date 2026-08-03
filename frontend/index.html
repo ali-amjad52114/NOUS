@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nous — a brain that keeps your promises</title>
+<title>Nous · a brain that keeps your promises</title>
 <style>
 :root{
   --bg:#edf4f2; --bg2:#e4efec; --card:#ffffff; --line:#dbe8e4;
@@ -170,7 +170,33 @@ a.graphlink:hover{background:#cfe6e1;}
 button.ghostbtn{background:#fff;border:1px solid var(--line);color:var(--body);font-size:12.5px;
   border-radius:99px;padding:9px 16px;cursor:pointer;font-weight:700;}
 button.ghostbtn:hover{border-color:var(--sage-soft);color:var(--ink);}
-@media(max-width:1080px){#hero{grid-template-columns:1fr}#board{grid-template-columns:1fr}#hero h1{font-size:44px}}
+/* ---------- under the hood ---------- */
+#built{max-width:1340px;margin:0 auto;padding:34px 44px 96px;}
+.builthead{text-align:center;margin-bottom:14px;}
+.builthead .eyebrow{font-size:12px;letter-spacing:2.2px;text-transform:uppercase;font-weight:800;color:var(--sage);}
+.builthead h2{font-size:36px;letter-spacing:-1.3px;margin-top:8px;}
+.builthead p{color:var(--body);font-size:15.5px;margin-top:10px;}
+.flowbar{display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;
+  margin:22px auto 30px;font-size:13px;font-weight:700;color:var(--body);}
+.flowbar .fstep{background:#fff;border:1px solid var(--line);border-radius:999px;padding:9px 16px;
+  box-shadow:0 3px 10px rgba(23,67,60,.05);}
+.flowbar .farr{color:var(--faint);font-weight:800;}
+.builtgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+.bcard{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:22px 22px 24px;
+  box-shadow:0 12px 32px rgba(23,67,60,.07);transition:.18s;}
+.bcard:hover{transform:translateY(-3px);box-shadow:0 18px 44px rgba(23,67,60,.11);}
+.bcard .role{display:inline-block;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;
+  font-weight:850;padding:5px 11px;border-radius:99px;margin-bottom:14px;}
+.bcard h4{font-size:18.5px;letter-spacing:-.4px;margin-bottom:8px;}
+.bcard p{color:var(--body);font-size:13.5px;line-height:1.6;}
+.bcard .use{margin-top:12px;font-size:12px;color:var(--mut);border-top:1px solid var(--line);padding-top:10px;line-height:1.55;}
+.bcard .use b{color:var(--ink);}
+.bcard.falkor .role{background:var(--sage-bg);color:var(--deep);}
+.bcard.rocket .role{background:var(--amber-bg);color:var(--amber);}
+.bcard.guild .role{background:var(--purple-bg);color:var(--purple);}
+.bcard.laser .role{background:var(--green-bg);color:var(--green);}
+@media(max-width:1080px){#hero{grid-template-columns:1fr}#board{grid-template-columns:1fr}#hero h1{font-size:44px}.builtgrid{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){.builtgrid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -185,9 +211,9 @@ button.ghostbtn:hover{border-color:var(--sage-soft);color:var(--ink);}
 <section id="hero">
   <div>
     <h1>A brain that <span class="acc">keeps</span> the promises you make.</h1>
-    <p class="sub">Nous listens to what you tell people — “I'll come see you before you go” —
-      works out who and when, checks your calendar, and turns the promise into a booked plan.
-      Teach it any routine once, and it handles it forever.</p>
+    <p class="sub">Tell Nous what you promised someone and it figures out the rest:
+      who you meant, when it should happen, and a real time that fits your calendar.
+      One tap books it. Show it a routine once and it handles that routine from then on.</p>
     <form id="herosay" action="/app" method="get" style="margin-top:30px;max-width:560px">
       <div class="sayrow" style="display:flex;gap:11px">
         <input id="say" name="say" autocomplete="off" required
@@ -196,11 +222,11 @@ button.ghostbtn:hover{border-color:var(--sage-soft);color:var(--ink);}
         <button type="submit" class="pill dark" style="border-radius:15px">Nous, remember this →</button>
       </div>
       <div id="sayhint" style="color:var(--mut);font-size:12.5px;margin-top:9px">
-        Nous works out <b>who</b> and <b>when</b>, proposes a real time — and takes you to your brain.</div>
+        Nous works out <b>who</b> and <b>when</b>, proposes a real time, and takes you straight to your brain.</div>
     </form>
     <div class="ctas">
       <a class="pill sage" href="/app">Open your brain →</a>
-      <a class="pill dark" href="/graph">Memory graph →</a>
+      <a class="pill dark" href="http://localhost:3000" target="_blank">Memory graph →</a>
     </div>
   </div>
   <div class="brainwrap"><div class="braininner">
@@ -209,6 +235,51 @@ button.ghostbtn:hover{border-color:var(--sage-soft);color:var(--ink);}
     <div class="brainstat bs2">promises kept <b id="statkept">0</b></div>
     <div class="brainstat bs3">skills <b id="statskills">0</b></div>
   </div></div>
+</section>
+
+<section id="built">
+  <div class="builthead">
+    <div class="eyebrow">How we built it</div>
+    <h2>Under the hood</h2>
+    <p>Four sponsor stacks, each doing the job it's best at. None of them are decorative.</p>
+  </div>
+  <div class="flowbar">
+    <span class="fstep">you say something</span><span class="farr">→</span>
+    <span class="fstep">LaserData streams it</span><span class="farr">→</span>
+    <span class="fstep">FalkorDB remembers it</span><span class="farr">→</span>
+    <span class="fstep">Guild agents check it</span><span class="farr">→</span>
+    <span class="fstep">RocketRide executes it</span>
+  </div>
+  <div class="builtgrid">
+    <div class="bcard falkor">
+      <span class="role">Memory</span>
+      <h4>FalkorDB</h4>
+      <p>Every person, promise, and learned protocol lives as a node in a live graph.
+        The brain reads and writes it on every single interaction.</p>
+      <div class="use"><b>Used for:</b> the entire memory layer. The Memory graph button opens the raw database so you can watch it grow in real time.</div>
+    </div>
+    <div class="bcard rocket">
+      <span class="role">Execution</span>
+      <h4>RocketRide</h4>
+      <p>Each skill Nous learns compiles into a .pipe pipeline. When a protocol fires,
+        the RocketRide engine is the thing actually doing the work.</p>
+      <div class="use"><b>Used for:</b> a custom Nous node plus generated pipelines per learned skill. The engine calls back into the brain's allowlisted actions.</div>
+    </div>
+    <div class="bcard guild">
+      <span class="role">Judgment</span>
+      <h4>Guild.ai</h4>
+      <p>Two agents watch over the brain: a distiller that turns observed behavior into a
+        typed protocol, and a critic that refuses anything unsafe.</p>
+      <div class="use"><b>Used for:</b> the human-in-the-loop gate. Nothing runs on your behalf until you approve it once.</div>
+    </div>
+    <div class="bcard laser">
+      <span class="role">Senses</span>
+      <h4>LaserData</h4>
+      <p>Every event in your life stream is published to Laser Stack the moment it happens,
+        so the brain never works from stale information.</p>
+      <div class="use"><b>Used for:</b> the real-time event feed. Messages, invoices, and calendar changes arrive as a stream, not a batch.</div>
+    </div>
+  </div>
 </section>
 
 </main>
