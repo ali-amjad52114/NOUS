@@ -6,6 +6,7 @@ call back into /actions/execute so the ENGINE is the execution path.
     python3 server.py          # -> http://127.0.0.1:7200
 
   POST /events            {event json}           -> brain ingests (watch/refuse/act)
+  POST /goals             {goal}                 -> plan goal + choose best free slot
   GET  /memory/similar    ?trigger_class=&q=     -> best matching protocol
   POST /actions/execute   {event_id, action, params, protocol?} -> allowlisted execution
   POST /actions/preconditions | /actions/verify  -> pipeline check hooks
@@ -73,6 +74,8 @@ class H(BaseHTTPRequestHandler):
         try:
             if self.path == "/events":
                 self._send(200, {"status": brain.ingest(b)})
+            elif self.path == "/goals":
+                self._send(200, brain.plan_goal(b.get("goal", "")))
             elif self.path == "/actions/execute":
                 actor = "brain" if b.get("protocol") else "human"
                 r = brain.inbox.execute(b["event_id"], b["action"], b.get("params", {}), actor)
