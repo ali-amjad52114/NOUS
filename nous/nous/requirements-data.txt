@@ -1,0 +1,2 @@
+FalkorDB==1.6.2
+apache-iggy==0.8.0

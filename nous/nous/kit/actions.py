@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import time
 
+from .laserdata import publish_event
+
 ALLOWED = {"forward", "label", "archive", "reply", "book", "send_message"}
 
 
@@ -54,6 +56,7 @@ class Inbox:
                    "action": action, "params": params, "actor": actor,
                    "result": result, "ts": time.time()}
         self.receipts.append(receipt)
+        publish_event(receipt, topic="receipts")
         return result
 
     def verify_handled(self, event_id: str) -> bool:
