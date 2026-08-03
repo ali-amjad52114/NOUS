@@ -54,8 +54,9 @@ class H(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
 
     def do_GET(self):
-        if self.path in ("/", "/index.html", "/console", "/console.html"):
-            name = "console.html" if "console" in self.path else "index.html"
+        route = self.path.split("?")[0]
+        if route in ("/", "/index.html", "/app", "/app.html", "/console", "/console.html"):
+            name = ("console.html" if "console" in route else "app.html" if "app" in route else "index.html")
             f = ROOT / "frontend" / name
             if f.exists():
                 self._send_html(f)

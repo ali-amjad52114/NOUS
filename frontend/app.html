@@ -175,115 +175,158 @@ button.ghostbtn:hover{border-color:var(--sage-soft);color:var(--ink);}
 </head>
 <body>
 <main>
-<nav>
-  <div class="logo"><span id="logopulse">🧠</span> Nous</div>
+<nav style="padding:16px 26px;">
+  <a class="logo" href="/" style="text-decoration:none;color:var(--ink)"><span>🧠</span> Nous</a>
   <div class="navlinks">
-    <a href="#app">Live demo</a><a href="#app">Promises</a><a href="#app">Protocols</a>
-    <a href="/console">Console</a><a href="http://localhost:3000" target="_blank">Memory graph</a>
+    <a href="/">Home</a><a href="/console">Console</a>
+    <a href="http://localhost:3000" target="_blank">Memory graph</a>
   </div>
   <span class="sp"></span>
-  <a class="pill ghost" href="http://localhost:3000" target="_blank">Open memory</a>
-  <a class="pill sage" href="#app" onclick="setTimeout(()=>document.getElementById('say').focus(),450)">Try Nous live</a>
+  <span class="live" style="font-size:11px"><i></i>live · brain service</span>
 </nav>
-
-<section id="hero">
-  <div>
-    <h1>A brain that <span class="acc">keeps</span> the promises you make.</h1>
-    <p class="sub">Nous listens to what you tell people — “I'll come see you before you go” —
-      works out who and when, checks your calendar, and turns the promise into a booked plan.
-      Teach it any routine once, and it handles it forever.</p>
-    <form id="herosay" action="/app" method="get" style="margin-top:30px;max-width:560px">
-      <div class="sayrow" style="display:flex;gap:11px">
-        <input id="say" name="say" autocomplete="off" required
-          placeholder="i wanna meet with kevin next week for dinner"
-          style="flex:1;background:#fff;border:2px solid var(--line);border-radius:15px;padding:16px 18px;font-size:16.5px;color:var(--ink);outline:none;">
-        <button type="submit" class="pill dark" style="border-radius:15px">Nous, remember this →</button>
+<section id="app">
+  <div class="apphead">
+    <div class="eyebrow">live — it starts knowing nothing</div>
+    <h2>Tell it something. Watch it remember.</h2>
+  </div>
+  <div id="saycard">
+    <label>What did you just tell someone?</label>
+    <div class="sayrow">
+      <input id="say" autocomplete="off" placeholder="i wanna meet with kevin next week for dinner">
+      <button id="saybtn">Nous, remember this →</button>
+    </div>
+    <div class="sayhint">Nous reads it, works out <b>who</b> and <b>when</b>, checks your calendar and proposes a real slot — then books it, messages them, and follows up. <span style="float:right"><button class="ghostbtn" id="next">simulate my inbox ▶</button></span></div>
+  </div>
+  <div id="board">
+    <div class="panel"><h3>Life stream</h3><div id="stream"><div class="empty">quiet so far — tell Nous something</div></div></div>
+    <div class="panel">
+      <h3>Nous — thinking</h3>
+      <div id="cards"></div>
+      <div id="watchbox">
+        <div class="hd">👀 watching you — show it how you handle this</div>
+        <button class="wbtn" onclick="watch('forward',{to:'accounting@myfirm.com'})">→ Forward to accounting@myfirm.com</button>
+        <button class="wbtn" onclick="watch('label',{name:'invoices'})">🏷 Label “invoices”</button>
+        <button class="wbtn" onclick="watch('archive',{})">📦 Archive it</button>
+        <button class="wbtn fin" onclick="post('/watch/done',{})">Done — learn what you saw</button>
       </div>
-      <div id="sayhint" style="color:var(--mut);font-size:12.5px;margin-top:9px">
-        Nous works out <b>who</b> and <b>when</b>, proposes a real time — and takes you to your brain.</div>
-    </form>
-    <div class="ctas">
-      <a class="pill sage" href="/app">Open your brain →</a>
-      <a class="pill ghost" href="/console">Power console →</a>
-      <a class="pill dark" href="http://localhost:3000" target="_blank">Memory graph →</a>
+      <div id="feed"></div>
+    </div>
+    <div class="panel"><h3>Memory</h3>
+      <div id="score">
+        <div class="you"><span class="n" id="nyou">0</span><span class="l">you did</span></div>
+        <div class="sep"></div>
+        <div class="brain"><span class="n" id="nbrain">0</span><span class="l">Nous did</span></div>
+      </div>
+      <div id="rail"></div>
+      <a class="graphlink" href="http://localhost:3000" target="_blank">Open full memory graph (FalkorDB) ↗</a>
     </div>
   </div>
-  <div class="brainwrap"><div class="braininner">
-    <svg id="brain" viewBox="0 0 520 430" width="100%" aria-label="Nous neural brain"></svg>
-    <div class="brainstat bs1"><span class="dot"></span> listening</div>
-    <div class="brainstat bs2">promises kept <b id="statkept">0</b></div>
-    <div class="brainstat bs3">skills <b id="statskills">0</b></div>
-  </div></div>
 </section>
-
 </main>
 
 <script>
-/* ============ animated neural brain ============ */
-const NODES = [
- [150,300],[118,252],[104,200],[112,150],[140,108],[184,80],[236,62],[292,56],[346,62],[396,82],
- [436,116],[458,160],[464,208],[452,254],[424,292],[384,318],[338,332],[290,336],[244,330],[198,316],
- [318,352],[356,356],[388,344],[268,368],
- [180,190],[172,250],[226,160],[228,236],[286,120],[292,196],[296,268],[352,152],[356,236],[404,196],[406,262],[246,296],[352,296]
+window.excite = function(){};
+/* ============ app wiring (unchanged endpoints) ============ */
+const STORY=[
+ {id:"evt-3",type:"message_in",channel:"gmail",from:"billing@acmedesign.co",person:"Acme Design",subject:"Invoice #4417 — due Aug 17",body:"Please find attached invoice for $850.",attachment:"invoice_4417.pdf"},
+ {id:"evt-4",type:"message_in",channel:"slack",from:"newsletter@technews.io",person:"TechNews",subject:"Your Monday briefing",body:"Top stories in AI this week..."},
+ {id:"evt-5",type:"message_in",channel:"gmail",from:"invoices@cloudhost.com",person:"CloudHost",subject:"CloudHost invoice CH-2231 for July",body:"Amount due: $120. Invoice attached.",attachment:"CH-2231.pdf"},
+ {id:"evt-6",type:"message_in",channel:"gmail",from:"accounts@metroutilities.com",person:"Metro Utilities",subject:"Metro Utilities — invoice 88213",body:"Your monthly invoice of $96 is attached.",attachment:"88213.pdf"},
 ];
-(function(){
-  const svg=document.getElementById('brain'), NS='http://www.w3.org/2000/svg';
-  const defs=document.createElementNS(NS,'defs');
-  defs.innerHTML=`<radialGradient id="gl" cx="50%" cy="45%" r="60%">
-      <stop offset="0%" stop-color="#bfe0da" stop-opacity=".9"/>
-      <stop offset="100%" stop-color="#bfe0da" stop-opacity="0"/></radialGradient>`;
-  svg.appendChild(defs);
-  const glow=document.createElementNS(NS,'ellipse');
-  glow.setAttribute('cx',280);glow.setAttribute('cy',210);glow.setAttribute('rx',215);glow.setAttribute('ry',175);
-  glow.setAttribute('fill','url(#gl)');svg.appendChild(glow);
-  // edges: connect each node to its 3 nearest
-  const edges=[],seen=new Set();
-  NODES.forEach((a,i)=>{
-    NODES.map((b,j)=>({j,d:Math.hypot(a[0]-b[0],a[1]-b[1])}))
-      .filter(o=>o.j!==i).sort((x,y)=>x.d-y.d).slice(0,3).forEach(o=>{
-        const k=Math.min(i,o.j)+'-'+Math.max(i,o.j);
-        if(!seen.has(k)){seen.add(k);edges.push([i,o.j]);}});
-  });
-  edges.forEach(([i,j])=>{
-    const l=document.createElementNS(NS,'line');
-    l.setAttribute('x1',NODES[i][0]);l.setAttribute('y1',NODES[i][1]);
-    l.setAttribute('x2',NODES[j][0]);l.setAttribute('y2',NODES[j][1]);
-    l.setAttribute('stroke','#8fc2b8');l.setAttribute('stroke-width','1.4');l.setAttribute('opacity','.4');
-    svg.appendChild(l);
-  });
-  const dots=NODES.map(([x,y],i)=>{
-    const c=document.createElementNS(NS,'circle');
-    c.setAttribute('cx',x);c.setAttribute('cy',y);c.setAttribute('r',4.2);
-    c.setAttribute('fill',i%4?'#5ea99d':'#17433c');svg.appendChild(c);return c;
-  });
-  let excite=0; window.excite=()=>{excite=Math.min(excite+22,60);};
-  let t=0;
-  (function tick(){
-    t+=.035;
-    dots.forEach((c,i)=>c.setAttribute('r',(3.4+1.6*Math.abs(Math.sin(t+i*1.7))).toFixed(2)));
-    const rate=.06+excite*.012; excite=Math.max(0,excite-.25);
-    if(Math.random()<rate){
-      const [i,j]=edges[Math.floor(Math.random()*edges.length)];
-      const s=document.createElementNS(NS,'circle');
-      s.setAttribute('r',3.4);s.setAttribute('fill','#2e8577');svg.appendChild(s);
-      const t0=performance.now(),D=520+Math.random()*420;
-      (function mv(now){const p=Math.min(1,(now-t0)/D);
-        s.setAttribute('cx',NODES[i][0]+(NODES[j][0]-NODES[i][0])*p);
-        s.setAttribute('cy',NODES[i][1]+(NODES[j][1]-NODES[i][1])*p);
-        s.setAttribute('opacity',1-p*.7);
-        p<1?requestAnimationFrame(mv):s.remove();})(t0);
-    }
-    requestAnimationFrame(tick);
-  })();
-})();
-
+let idx=0, firstEvt=true, lastLog=0;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
 async function post(p,b){const r=await fetch(p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});return r.json();}
-setInterval(async()=>{try{const s=await (await fetch("/state")).json();
-  const k=document.getElementById("statkept"),sk=document.getElementById("statskills");
-  if(k)k.textContent=(s.commitments||[]).filter(c=>c.status==="booked").length;
-  if(sk)sk.textContent=(s.protocols||[]).length;
-  if((s.log||[]).length)window.excite&&window.excite();
-}catch(e){}},1400);
+async function watch(a,p){await post("/watch/action",{action:a,params:p});}
+function addStream(html,cls){
+  if(firstEvt){$("stream").innerHTML="";firstEvt=false;}
+  const d=document.createElement("div");d.className="evt "+cls;d.innerHTML=html;
+  $("stream").prepend(d);
+}
+async function sayIt(){
+  const el=$("say"),text=el.value.trim();if(!text)return;
+  addStream(`<span class="chip you">you said</span><br><b>“${esc(text)}”</b>`,"you");
+  el.value=""; window.excite();
+  const r=await post("/promise",{text});
+  if(r.status==="need_person"){el.placeholder="who with? try: …with Kevin";el.focus();}
+}
+$("saybtn").onclick=sayIt;
+$("say").addEventListener("keydown",e=>{if(e.key==="Enter")sayIt();});
+$("next").onclick=async()=>{
+  if(idx>=STORY.length){$("next").textContent="— inbox empty —";return;}
+  const e=STORY[idx++]; window.excite();
+  addStream(`<span class="chip">${e.channel}</span><span class="who">${esc(e.person)}</span><br><b>${esc(e.subject)}</b><br><span style="color:var(--faint);font-size:12px">${esc(e.body.slice(0,66))}…</span>`,
+    e.subject.includes("briefing")?"noise":"");
+  await post("/events",e);
+};
+function commitCard(c){
+  const slot=c.proposed_slot||"";const [d,t]=slot.split(", ");
+  return `<div class="card promise">
+    <div class="kicker">🤝 promise detected</div>
+    <div class="who-row"><div class="avatar">${esc((c.person||"?")[0].toUpperCase())}</div>
+      <div><div class="t1">${esc(c.activity||"time")} with ${esc(c.person)}</div>
+      <div class="t2">“${esc((c.promise||"").slice(0,58))}”</div></div></div>
+    <div class="slot"><span class="d">📅 ${esc(d||slot)}${t?" · "+esc(t):""}</span>
+      <span class="s">${esc(c.window_label||"")}<br>day ${c.days_out||"?"} of ${c.deadline_days}</span></div>
+    <button class="btn-book" onclick="post('/approve-commitment',{commitment_id:'${c.id}'})">✅ Book it — and tell ${esc(c.person)}</button>
+  </div>`;
+}
+function render(s){
+  const m=(s.scoreboard||"").match(/you:\s*(\d+).*brain:\s*(\d+)/);
+  if(m){$("nyou").textContent=m[1];$("nbrain").textContent=m[2];}
+  if((s.log||[]).length>lastLog){window.excite();lastLog=s.log.length;}
+  $("watchbox").style.display=s.watching?"block":"none";
+  const commits=s.commitments||[], protos=s.protocols||[];
+  var _k=$("statkept"); if(_k)_k.textContent=commits.filter(c=>c.status==="booked").length;
+  var _s=$("statskills"); if(_s)_s.textContent=protos.length;
+  const cards=[];
+  commits.filter(c=>c.status==="proposed").forEach(c=>cards.push(commitCard(c)));
+  const seen=new Set();
+  for(const ln of (s.log||[]).slice(-26)){
+    if(ln.includes("REFUSING")&&!seen.has("r")){seen.add("r");
+      cards.push(`<div class="card refuse"><div class="kicker">✋ refusing to act</div>
+        <div class="bd">${esc(ln.replace(/^✋\s*/,"").trim())}</div>
+        <div class="meta">Nous never runs a protocol you haven't approved.</div></div>`);}
+    else if(ln.includes("PROTOCOL DISTILLED")&&!seen.has("l")){seen.add("l");
+      cards.push(`<div class="card learn"><div class="kicker">🧠 learned a new protocol</div>
+        <div class="bd">${esc(ln.replace(/^🧠\s*/,"").trim())}</div>
+        <div class="meta">Guild Safety Critic reviewed it · compiled to a RocketRide pipeline · awaiting your approval</div></div>`);}
+    else if(ln.includes("done autonomously")&&!seen.has("a")){seen.add("a");
+      cards.push(`<div class="card auto"><div class="kicker">⚡ handled it alone</div>
+        <div class="bd">${esc(ln.replace(/^\s*✅\s*/,"").trim())}</div></div>`);}
+    else if(ln.includes("📌 booked")&&!seen.has("b")){seen.add("b");
+      cards.push(`<div class="card auto"><div class="kicker">📌 promise kept</div>
+        <div class="bd">${esc(ln.replace(/^\s*📌\s*/,"").trim())}</div>
+        <div class="meta">calendar hold + message sent + follow-up scheduled — by a RocketRide pipeline</div></div>`);}
+  }
+  $("cards").innerHTML=cards.slice(0,3).join("");
+  const f=$("feed");f.innerHTML=(s.log||[]).slice(-30).map(l=>`<div class="ln">${esc(l)}</div>`).join("");
+  f.scrollTop=f.scrollHeight;
+  const rail=[];
+  for(const c of commits){
+    rail.push(`<div class="item"><div class="top"><span class="nm">${esc(c.activity||"plan")} · ${esc(c.person)}</span>
+      <span class="st ${c.status}">${(c.status||"open").toUpperCase()}</span></div>
+      <div class="sub">${esc((c.promise||"").slice(0,60))}${c.booked_slot?`<br>📅 <b>${esc(c.booked_slot)}</b>`:""}</div></div>`);
+  }
+  for(const p of protos){
+    rail.push(`<div class="item"><div class="top"><span class="nm">${esc(p.name)}</span>
+      <span class="st ${p.approved?"armed":"pending"}">${p.approved?"ARMED":"PENDING"}</span></div>
+      <div class="sub">taught by ${esc(p.taught_by)} · used ${p.uses||0}×</div>
+      ${p.approved?"":`<button class="btn-approve" onclick="post('/approve',{protocol_id:'${p.id}'})">Approve ${p.id} — arm it</button>`}</div>`);
+  }
+  if((s.contacts||[]).length)rail.push(`<div class="item"><div class="sub">🧑 knows ${s.contacts.length} people · ${s.receipts||0} actions receipted</div></div>`);
+  $("rail").innerHTML=rail.join("")||`<div class="empty">memory is empty — Nous starts knowing nothing</div>`;
+}
+(async()=>{  // arriving from the landing page with a spoken promise
+  const q=new URLSearchParams(location.search).get("say");
+  if(q){
+    addStream(`<span class="chip you">you said</span><br><b>“${esc(q)}”</b>`,"you");
+    const r=await post("/promise",{text:q});
+    if(r.status==="need_person"){const el=$("say"); if(el){el.placeholder="who with? try: …with Kevin"; el.focus();}}
+    history.replaceState({},"","/app");
+  }
+})();
+setInterval(async()=>{try{render(await (await fetch("/state")).json());}catch(e){}},700);
 </script>
 </body>
 </html>
