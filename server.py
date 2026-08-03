@@ -34,6 +34,7 @@ class H(BaseHTTPRequestHandler):
         b = json.dumps(obj).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Content-Length", str(len(b)))
         self.end_headers()
         self.wfile.write(b)
@@ -43,7 +44,18 @@ class H(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
 
     def do_GET(self):
-        if self.path.startswith("/memory/similar"):
+        if self.path in ("/", "/index.html"):
+            f = Path(__file__).resolve().parent / "frontend" / "index.html"
+            if f.exists():
+                b = f.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(b)))
+                self.end_headers()
+                self.wfile.write(b)
+                return
+            self._send(404, {"error": "frontend/index.html not found"})
+        elif self.path.startswith("/memory/similar"):
             from urllib.parse import parse_qs, urlparse
             qs = parse_qs(urlparse(self.path).query)
             m = brain.store.find_protocol(qs.get("trigger_class", [""])[0], qs.get("q", [""])[0])

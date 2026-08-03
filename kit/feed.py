@@ -23,11 +23,11 @@ FREE_SLOTS = [
 STORY = [
     # -- the heart of the demo -------------------------------------------
     {"id": "evt-1", "type": "message_in", "channel": "gmail", "from": "sam.k@gmail.com",
-     "person": "Sam", "subject": "some news",
-     "body": "Hey man. Got my diagnosis this week — it's cancer. Starting chemo at the end of the month. Weird few days."},
+     "person": "Sam", "subject": "moving to London",
+     "body": "Hey man — it's official, I'm moving to London. Flight's on the 18th. Feels like we barely got to hang out this year."},
     {"id": "evt-2", "type": "message_out", "channel": "gmail", "to": "sam.k@gmail.com",
-     "person": "Sam", "subject": "re: some news",
-     "body": "Sam, I'm so sorry. Whatever you need. I'm coming to see you soon, I promise."},
+     "person": "Sam", "subject": "re: moving to London",
+     "body": "No way! I'm coming to see you before you go, I promise. Not missing this one."},
     # -- the mechanism generalizes: learn-once protocols ------------------
     {"id": "evt-3", "type": "message_in", "channel": "gmail", "from": "billing@acmedesign.co",
      "person": "Acme Design", "subject": "Invoice #4417 — due Aug 17",
@@ -53,7 +53,7 @@ def classify(evt: dict) -> str:
     if evt.get("type") == "message_out" and PROMISE_RE.search(evt.get("body", "")):
         return "promise_made"
     if evt.get("type") == "message_in" and any(
-            w in text for w in ("diagnosis", "chemo", "cancer", "hospital", "surgery")):
+            w in text for w in ("moving to", "flight's on", "last day", "leaving town", "relocating")):
         return "important_personal"
     if "invoice" in text and (evt.get("attachment") or "due" in text):
         return "incoming_invoice"
