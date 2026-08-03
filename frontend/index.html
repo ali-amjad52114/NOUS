@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nous — a brain that keeps your promises</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#0b0f14; color:#dbe4ee; font:14px/1.45 -apple-system,system-ui,Segoe UI,sans-serif; }
+  header { display:flex; align-items:center; gap:14px; padding:14px 22px; border-bottom:1px solid #1d2733; }
+  header h1 { font-size:19px; margin:0; letter-spacing:.4px; }
+  header .tag { color:#7d8b9c; font-size:12.5px; }
+  #board { display:grid; grid-template-columns: 300px 1fr 330px; gap:14px; padding:14px 18px; height:calc(100vh - 62px); }
+  .panel { background:#0f151d; border:1px solid #1d2733; border-radius:12px; padding:12px; overflow-y:auto; }
+  .panel h2 { font-size:12px; text-transform:uppercase; letter-spacing:1.2px; color:#7d8b9c; margin:2px 0 10px; }
+  button { background:#1b2836; color:#dbe4ee; border:1px solid #2c3d51; border-radius:8px; padding:8px 12px; font-size:13px; cursor:pointer; }
+  button:hover { background:#24344a; }
+  button.primary { background:#8a5a00; border-color:#c98a10; color:#ffe9c2; font-weight:700; }
+  button.primary:hover { background:#a56d02; }
+  button.go { background:#0f3d2a; border-color:#1e6b48; color:#c5f2d8; font-weight:700; }
+  /* life stream */
+  .evt { border:1px solid #223140; border-radius:10px; padding:8px 10px; margin-bottom:8px; font-size:12.5px; }
+  .evt .who { color:#8fa3b8; font-size:11px; }
+  .evt.sam { border-color:#2b5f8f; background:#0e1a26; }
+  .evt.noise { opacity:.45; }
+  .chip { display:inline-block; font-size:10px; padding:1px 7px; border-radius:99px; background:#1b2836; color:#9fb2c6; margin-right:6px; }
+  /* brain feed */
+  #feed .ln { font-family:ui-monospace,Menlo,monospace; font-size:12.3px; white-space:pre-wrap; padding:1.5px 4px; color:#aebccb; }
+  .card { border-radius:12px; padding:12px 14px; margin:10px 0; border:1px solid; }
+  .card.promise { background:#221703; border-color:#c98a10; }
+  .card.promise .big { font-size:15.5px; font-weight:800; color:#ffd479; }
+  .card.refuse { background:#230f12; border-color:#a33; color:#ffb3b3; font-weight:700; }
+  .card.auto { background:#07771e14; background:#0c1f14; border-color:#1e6b48; color:#b9f0cf; }
+  .card.learn { background:#170f23; border-color:#6b4bd6; color:#d7c9ff; }
+  .muted { color:#7d8b9c; font-size:12px; }
+  /* right rail */
+  #score { font-size:15px; text-align:center; background:#0c1420; border:1px solid #223140; border-radius:12px; padding:10px; margin-bottom:12px; }
+  #score .n { font-size:34px; font-weight:900; display:block; }
+  #score .you .n { color:#e2b25a; } #score .brain .n { color:#59d98e; }
+  #score .cols { display:flex; justify-content:space-around; }
+  .item { border:1px solid #223140; border-radius:10px; padding:8px 10px; margin-bottom:8px; font-size:12.3px; }
+  .st { font-size:10px; font-weight:800; padding:1px 7px; border-radius:99px; }
+  .st.armed, .st.booked { background:#123african; background:#12351f; color:#7ce0a3; }
+  .st.pending, .st.proposed { background:#3a2a07; color:#ffd479; }
+  #watchbox { border:1px dashed #6b4bd6; border-radius:12px; padding:10px; margin:10px 0; display:none; }
+  #watchbox .wbtn { display:block; width:100%; margin:6px 0; }
+  a { color:#6fb3ff; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧠 Nous</h1><span class="tag">a brain that keeps your promises — live</span>
+  <span style="flex:1"></span>
+  <button id="next" class="go">Next life event ▶</button>
+</header>
+<div id="board">
+  <div class="panel"><h2>Life stream</h2><div id="stream"></div></div>
+  <div class="panel"><h2>Nous — brain feed</h2><div id="cards"></div><div id="watchbox">
+      <div class="muted">👀 Nous is watching — show it how you handle this:</div>
+      <button class="wbtn" onclick="watch('forward',{to:'accounting@myfirm.com'})">Forward to accounting</button>
+      <button class="wbtn" onclick="watch('label',{name:'invoices'})">Label “invoices”</button>
+      <button class="wbtn" onclick="watch('archive',{})">Archive</button>
+      <button class="wbtn primary" onclick="post('/watch/done',{})">Done — distill what you saw</button>
+    </div><div id="feed"></div></div>
+  <div class="panel"><h2>Memory & controls</h2>
+    <div id="score"><div class="cols">
+      <div class="you"><span class="n" id="nyou">0</span>you</div>
+      <div class="brain"><span class="n" id="nbrain">0</span>Nous</div>
+    </div></div>
+    <div id="approvals"></div>
+    <div id="graph"></div>
+    <a href="http://localhost:3000" target="_blank">Open memory graph (FalkorDB) ↗</a>
+  </div>
+</div>
+<script>
+const API = "";   // same origin — server.py serves this page
+const STORY = [
+ {id:"evt-1",type:"message_in",channel:"gmail",from:"sam.k@gmail.com",person:"Sam",subject:"some news",body:"Hey man. Got my diagnosis this week — it's cancer. Starting chemo at the end of the month. Weird few days."},
+ {id:"evt-2",type:"message_out",channel:"gmail",to:"sam.k@gmail.com",person:"Sam",subject:"re: some news",body:"Sam, I'm so sorry. Whatever you need. I'm coming to see you soon, I promise."},
+ {id:"evt-3",type:"message_in",channel:"gmail",from:"billing@acmedesign.co",person:"Acme Design",subject:"Invoice #4417 — due Aug 17",body:"Please find attached invoice for $850.",attachment:"invoice_4417.pdf"},
+ {id:"evt-4",type:"message_in",channel:"slack",from:"newsletter@technews.io",person:"TechNews",subject:"Your Monday briefing",body:"Top stories in AI this week..."},
+ {id:"evt-5",type:"message_in",channel:"gmail",from:"invoices@cloudhost.com",person:"CloudHost",subject:"CloudHost invoice CH-2231 for July",body:"Amount due: $120. Invoice attached.",attachment:"CH-2231.pdf"},
+ {id:"evt-6",type:"message_in",channel:"gmail",from:"accounts@metroutilities.com",person:"Metro Utilities",subject:"Metro Utilities — invoice 88213",body:"Your monthly invoice of $96 is attached.",attachment:"88213.pdf"},
+];
+let idx = 0;
+async function post(path, body){ const r = await fetch(API+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); return r.json(); }
+async function watch(action, params){ await post("/watch/action",{action,params}); }
+document.getElementById("next").onclick = async () => {
+  if (idx >= STORY.length){ document.getElementById("next").textContent = "— end of day —"; return; }
+  const e = STORY[idx++];
+  const d = document.createElement("div");
+  d.className = "evt" + (e.person==="Sam" ? " sam" : "") + (e.subject.includes("briefing") ? " noise" : "");
+  d.innerHTML = `<span class="chip">${e.channel}</span><span class="who">${e.type==="message_out"?("you → "+e.person):(e.person)}</span><br><b>${e.subject}</b><br><span class="muted">${e.body.slice(0,90)}…</span>`;
+  document.getElementById("stream").prepend(d);
+  await post("/events", e);
+};
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+function render(state){
+  // scoreboard: "actions — you: N · brain: N · receipts: N"
+  const m = (state.scoreboard||"").match(/you:\s*(\d+).*brain:\s*(\d+)/);
+  if (m){ document.getElementById("nyou").textContent=m[1]; document.getElementById("nbrain").textContent=m[2]; }
+  // watch mode
+  document.getElementById("watchbox").style.display = state.watching ? "block" : "none";
+  // feed + hero cards
+  const cards = [], feed = [];
+  const seen = new Set();
+  for (const ln of state.log){
+    if (ln.includes("PROMISE DETECTED")) { cards.push(`<div class="card promise"><div class="big">🤝 PROMISE DETECTED</div><div id="promiseinfo"></div></div>`); }
+    else if (ln.includes("▶ You're free") && !seen.has("slot")) { seen.add("slot");
+      const cid = (ln.match(/approve (C-\d+)/)||[])[1] || "C-001";
+      cards.push(`<div class="card promise">${esc(ln.trim())}<br><br><button class="primary" onclick="post('/approve-commitment',{commitment_id:'${cid}'})">✅ Book it</button> <span class="muted">day 0 of 15</span></div>`); }
+    else if (ln.includes("REFUSING")) cards.push(`<div class="card refuse">✋ ${esc(ln.trim())}</div>`);
+    else if (ln.includes("PROTOCOL DISTILLED")) cards.push(`<div class="card learn">🧠 ${esc(ln.trim())} — pending your approval</div>`);
+    else if (ln.includes("done autonomously") || ln.includes("pipeline 'keep-a-promise'")) cards.push(`<div class="card auto">⚡ ${esc(ln.trim())}</div>`);
+    feed.push(`<div class="ln">${esc(ln)}</div>`);
+  }
+  document.getElementById("cards").innerHTML = cards.slice(-4).join("");
+  const f = document.getElementById("feed"); f.innerHTML = feed.slice(-40).join(""); f.scrollTop = f.scrollHeight;
+  // approvals + graph from describe() text
+  const g = state.graph || "";
+  const ap = [];
+  for (const mm of g.matchAll(/\(:Protocol (P-\d+)\) '([^']+)'.*\[PENDING/g))
+    ap.push(`<div class="item">${mm[1]} “${mm[2]}” <span class="st pending">PENDING</span><br><button class="primary" style="margin-top:6px" onclick="post('/approve',{protocol_id:'${mm[1]}'})">Approve ${mm[1]}</button></div>`);
+  document.getElementById("approvals").innerHTML = ap.join("");
+  document.getElementById("graph").innerHTML = g.split("\n").map(l=>{
+    l = esc(l);
+    l = l.replace(/\[(ARMED|BOOKED)[^\]]*\]/g,'<span class="st armed">$1</span>').replace(/\[(PENDING[^\]]*|PROPOSED)\]/g,'<span class="st pending">PENDING</span>');
+    return `<div class="item">${l}</div>`;
+  }).slice(0,14).join("");
+}
+setInterval(async ()=>{ try{ const r = await fetch(API+"/state"); render(await r.json()); }catch(e){} }, 800);
+</script>
+</body>
+</html>
