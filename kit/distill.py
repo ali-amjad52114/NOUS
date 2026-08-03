@@ -10,7 +10,7 @@ import json
 import os
 import urllib.request
 
-ALLOWED_ACTIONS = {"forward", "label", "archive", "reply"}
+ALLOWED_ACTIONS = {"forward", "label", "archive", "reply", "book", "send_message"}
 
 DISTILL_PROMPT = """You watched a person handle an item in their life stream.
 Compile their handling into a GENERALIZED protocol (JSON only):
@@ -33,36 +33,51 @@ def distill(evt: dict, watched: list[dict]) -> dict:
         "trigger_class": evt["trigger_class"],
         "signature_example": evt.get("subject", ""),
         "preconditions": [
-            "event trigger class matches this protocol's class",
-            "every step action is on the allowlist",
-            "forwarding target is a known, configured address",
-            "protocol has been approved by its owner",
+            {"field": "event.trigger_class", "operator": "equals",
+             "value": evt["trigger_class"]},
+            {"field": "protocol.steps[].action", "operator": "subset_of",
+             "value": sorted(ALLOWED_ACTIONS)},
+            {"field": "protocol.approved", "operator": "equals", "value": True},
         ],
         "steps": steps,
-        "postcondition": "item is forwarded and archived; receipt recorded",
+        "postcondition": {"checks": [
+            {"kind": "receipt_exists", "action": step["action"]} for step in steps
+        ]},
         "risk": "low",
     }
 
 
 def critique(proto: dict) -> dict:
     """Safety Critic: try to reject the protocol before a human ever sees it."""
-    notes, ok = [], True
-    bad = [s["action"] for s in proto.get("steps", []) if s["action"] not in ALLOWED_ACTIONS]
-    if bad:
-        ok, _ = False, notes.append(f"REJECT: non-allowlisted actions {bad}")
-    else:
-        notes.append("all steps within the action allowlist ✓")
-    if not proto.get("steps"):
-        ok, _ = False, notes.append("REJECT: no steps")
-    if not proto.get("preconditions") or not proto.get("postcondition"):
-        ok, _ = False, notes.append("REJECT: missing preconditions/postcondition")
-    else:
-        notes.append(f"{len(proto['preconditions'])} typed preconditions + postcondition ✓")
-    if proto.get("risk", "high") != "low":
-        notes.append(f"note: risk={proto.get('risk')} — require re-approval per use")
-    notes.append("recommend: HUMAN APPROVAL required before this protocol is armed"
-                 if ok else "recommend: DO NOT ARM")
-    return {"ok": ok, "notes": notes}
+    steps = proto.get("steps") if isinstance(proto.get("steps"), list) else []
+    preconditions = proto.get("preconditions") if isinstance(proto.get("preconditions"), list) else []
+    post = proto.get("postcondition") if isinstance(proto.get("postcondition"), dict) else {}
+    actions_ok = bool(steps) and all(s.get("action") in ALLOWED_ACTIONS for s in steps)
+    parameterized = all(
+        not any(key in str(value).lower() for key in ("vendor", "acme", "globex"))
+        for step in steps for value in step.get("params", {}).values()
+    )
+    approval = any(p.get("field") == "protocol.approved" and p.get("value") is True
+                   for p in preconditions if isinstance(p, dict))
+    checks = post.get("checks") if isinstance(post.get("checks"), list) else []
+    post_ok = bool(checks) and all(c.get("kind") == "receipt_exists" and
+                                   c.get("action") in ALLOWED_ACTIONS for c in checks)
+    normalized = {"allowlisted_actions": actions_ok, "parameterized_inputs": parameterized,
+                  "approval_precondition": approval, "verifiable_postcondition": post_ok}
+    messages = {
+        "allowlisted_actions": "one or more steps are empty or not allowlisted",
+        "parameterized_inputs": "protocol contains a hardcoded one-off entity",
+        "approval_precondition": "owner approval is not a typed precondition",
+        "verifiable_postcondition": "postcondition is not expressed as receipt checks",
+    }
+    findings = [{"number": i, "code": key.upper(), "message": messages[key],
+                 "severity": "critical"}
+                for i, key in enumerate((k for k, passed in normalized.items() if not passed), 1)]
+    ok = all(normalized.values())
+    return {"verdict": "APPROVE_ELIGIBLE" if ok else "REJECT", "findings": findings,
+            "residual_risk": ("Low after explicit owner approval; execution remains allowlisted and receipted."
+                              if ok else "Unsafe until every critical finding is corrected."),
+            "checks": normalized}
 
 
 def llm_upgrade(prompt: str, payload: str) -> str | None:

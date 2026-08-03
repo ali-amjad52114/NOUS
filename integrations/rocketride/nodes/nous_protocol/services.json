@@ -1,0 +1,40 @@
+{
+  "title": "Nous Protocol Executor",
+  "protocol": "nous_protocol://",
+  "classType": ["text"],
+  "register": "filter",
+  "node": "python",
+  "path": "nodes.nous_protocol",
+  "prefix": "nous_protocol",
+  "description": [
+    "Executes an armed Nous protocol through guarded HTTP callbacks.",
+    "Runs preconditions, stable idempotent steps, and postcondition verification in order."
+  ],
+  "lanes": {"text": ["text"]},
+  "preconfig": {
+    "default": "default",
+    "profiles": {
+      "default": {
+        "callback_base": "http://127.0.0.1:7200",
+        "protocol_id": "",
+        "trigger_class": "",
+        "steps": [],
+        "postcondition": ""
+      }
+    }
+  },
+  "fields": {
+    "callback_base": {"type": "string", "title": "Nous callback base"},
+    "protocol_id": {"type": "string", "title": "Protocol ID"},
+    "trigger_class": {"type": "string", "title": "Trigger class"},
+    "steps": {"type": "array", "title": "Ordered protocol steps", "items": {"type": "object"}},
+    "postcondition": {"type": "string", "title": "Postcondition"}
+  },
+  "shape": [
+    {
+      "section": "Pipe",
+      "title": "Nous execution contract",
+      "properties": ["callback_base", "protocol_id", "trigger_class", "steps", "postcondition"]
+    }
+  ]
+}

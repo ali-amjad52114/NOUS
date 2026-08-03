@@ -1,0 +1,10 @@
+{
+  "protocol": {
+    "name": "Unsafe invoice handler", "trigger_class": "incoming_invoice",
+    "signature_example": "invoice", "risk": "low",
+    "preconditions": [{"field": "protocol.approved", "operator": "equals", "value": true}],
+    "steps": [{"action": "wire_money", "params": {"to": "$vendor"}}],
+    "postcondition": {"checks": [{"kind": "receipt_exists", "action": "wire_money"}]}
+  },
+  "expected": "REJECT_OR_SCHEMA_FAILURE"
+}

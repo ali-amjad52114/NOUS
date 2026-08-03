@@ -84,8 +84,8 @@ def _window(text: str) -> tuple[int, int, str]:
 
 
 def _fmt(dt: datetime) -> str:
-    hour = dt.strftime("%-I:%M %p") if dt.minute else dt.strftime("%-I %p")
-    return f"{dt.strftime('%A %b %-d')}, {hour}"
+    hour = (dt.strftime("%I:%M %p") if dt.minute else dt.strftime("%I %p")).lstrip("0")
+    return f"{dt.strftime('%A %b')} {dt.day}, {hour}"
 
 
 def propose_slot(lo: int, hi: int, hour: int, now: datetime | None = None) -> tuple[str, int]:

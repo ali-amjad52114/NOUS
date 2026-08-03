@@ -219,4 +219,5 @@ class FalkorStore(LocalStore):
 def make_store():
     if os.environ.get("MEMORY_BACKEND") == "falkor":
         return FalkorStore()
-    return LocalStore()
+    configured = os.environ.get("NOUS_MEMORY_PATH")
+    return LocalStore(Path(configured).resolve()) if configured else LocalStore()

@@ -1,90 +1,88 @@
 {
-  "_comment": "Auto-compiled by the personal brain from protocol P-001 ('Handle incoming invoice'), taught by Abhinav. Finalize node schema on the RocketRide VS Code canvas.",
-  "name": "brain-p-001",
-  "version": 1,
-  "source": {
-    "type": "webhook",
-    "path": "/protocol/P-001"
-  },
-  "nodes": [
+  "components": [
     {
-      "id": "trigger",
-      "type": "webhook",
-      "path": "/protocol/P-001",
-      "comment": "fires when an event of class 'incoming_invoice' arrives"
-    },
-    {
-      "id": "preconditions",
-      "type": "http",
-      "method": "POST",
-      "url": "http://127.0.0.1:7200/actions/preconditions",
-      "comment": "verify every typed precondition before touching anything"
-    },
-    {
-      "id": "step1_forward",
-      "type": "http",
-      "method": "POST",
-      "url": "http://127.0.0.1:7200/actions/execute",
-      "body": {
-        "action": "forward",
-        "params": {
-          "to": "accounting@myfirm.com"
-        },
-        "protocol": "P-001"
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "webhook"
+      },
+      "ui": {
+        "position": {
+          "x": 20,
+          "y": 160
+        }
       }
     },
     {
-      "id": "step2_label",
-      "type": "http",
-      "method": "POST",
-      "url": "http://127.0.0.1:7200/actions/execute",
-      "body": {
-        "action": "label",
-        "params": {
-          "name": "invoices"
-        },
-        "protocol": "P-001"
+      "id": "nous_protocol_1",
+      "provider": "nous_protocol",
+      "config": {
+        "type": "nous_protocol",
+        "callback_base": "http://127.0.0.1:7200",
+        "protocol_id": "P-001",
+        "trigger_class": "incoming_invoice",
+        "steps": [
+          {
+            "action": "forward",
+            "params": {
+              "to": "accounting@myfirm.com"
+            }
+          },
+          {
+            "action": "label",
+            "params": {
+              "name": "invoices"
+            }
+          },
+          {
+            "action": "archive",
+            "params": {}
+          }
+        ],
+        "postcondition": "{\"checks\":[{\"action\":\"forward\",\"kind\":\"receipt_exists\"},{\"action\":\"label\",\"kind\":\"receipt_exists\"},{\"action\":\"archive\",\"kind\":\"receipt_exists\"}]}"
+      },
+      "input": [
+        {
+          "lane": "text",
+          "from": "webhook_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 240,
+          "y": 160
+        }
       }
     },
     {
-      "id": "step3_archive",
-      "type": "http",
-      "method": "POST",
-      "url": "http://127.0.0.1:7200/actions/execute",
-      "body": {
-        "action": "archive",
-        "params": {},
-        "protocol": "P-001"
+      "id": "response_text_1",
+      "provider": "response_text",
+      "config": {
+        "laneName": "result"
+      },
+      "input": [
+        {
+          "lane": "text",
+          "from": "nous_protocol_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 460,
+          "y": 160
+        }
       }
-    },
-    {
-      "id": "verify",
-      "type": "http",
-      "method": "POST",
-      "url": "http://127.0.0.1:7200/actions/verify",
-      "comment": "item is forwarded and archived; receipt recorded"
     }
   ],
-  "lanes": [
-    [
-      "trigger",
-      "preconditions"
-    ],
-    [
-      "preconditions",
-      "step1_forward"
-    ],
-    [
-      "step1_forward",
-      "step2_label"
-    ],
-    [
-      "step2_label",
-      "step3_archive"
-    ],
-    [
-      "step3_archive",
-      "verify"
-    ]
-  ]
+  "project_id": "62d95053-1710-5e7a-910e-63626d8cbaf8",
+  "description": "Nous protocol P-001 (incoming_invoice)",
+  "viewport": {
+    "x": 0,
+    "y": 0,
+    "zoom": 1
+  },
+  "version": 1
 }

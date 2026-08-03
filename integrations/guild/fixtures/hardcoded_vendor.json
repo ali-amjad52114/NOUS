@@ -1,0 +1,10 @@
+{
+  "protocol": {
+    "name": "Pay Acme only", "trigger_class": "incoming_invoice",
+    "signature_example": "ACME invoice 887", "risk": "low",
+    "preconditions": [{"field": "protocol.approved", "operator": "equals", "value": true}],
+    "steps": [{"action": "forward", "params": {"to": "acme-vendor@example.com"}}],
+    "postcondition": {"checks": [{"kind": "receipt_exists", "action": "forward"}]}
+  },
+  "expected": "REJECT"
+}
