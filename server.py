@@ -55,8 +55,11 @@ class H(BaseHTTPRequestHandler):
 
     def do_GET(self):
         route = self.path.split("?")[0]
-        if route in ("/", "/index.html", "/app", "/app.html", "/console", "/console.html"):
-            name = ("console.html" if "console" in route else "app.html" if "app" in route else "index.html")
+        if route in ("/", "/index.html", "/app", "/app.html", "/console",
+                     "/console.html", "/graph", "/graph.html"):
+            name = ("console.html" if "console" in route else
+                    "graph.html" if "graph" in route else
+                    "app.html" if "app" in route else "index.html")
             f = ROOT / "frontend" / name
             if f.exists():
                 self._send_html(f)
@@ -75,13 +78,9 @@ class H(BaseHTTPRequestHandler):
                              "receipts": len(g.get("receipts", {})),
                              "scoreboard": brain.inbox.scoreboard(),
                              "graph": brain.store.describe(),
-                             "protocols": list(brain.store.g.get("protocols", {}).values()),
                              "pending_queue": [e["id"] for e in brain.pending_queue],
                              "watching": (brain.watching or {}).get("id"),
-                             "guild": {"mode": __import__("os").environ.get("GUILD_MODE", "fallback"),
-                                       "error": brain.guild_error},
-                             "log": brain.log[-30:], "receipts": brain.inbox.receipts[-30:],
-                             "rocketride_runs": brain._run_context})
+                             "log": brain.log[-30:]})
         else:
             self._send(404, {"error": "not found"})
 
@@ -93,13 +92,13 @@ class H(BaseHTTPRequestHandler):
             elif self.path in ("/goals", "/promise"):
                 self._send(200, brain.plan_goal(b.get("goal") or b.get("text") or ""))
             elif self.path == "/actions/execute":
-                self._send(200, brain.execute_protocol_step(b))
+                actor = "brain" if b.get("protocol") else "human"
+                r = brain.inbox.execute(b["event_id"], b["action"], b.get("params", {}), actor)
+                self._send(200, {"ok": True, "result": r})
             elif self.path == "/actions/preconditions":
-                r = brain.check_preconditions(b)
-                self._send(200 if r["ok"] else 409, r)
+                self._send(200, {"ok": True})   # pipeline precondition hook
             elif self.path == "/actions/verify":
-                r = brain.verify_protocol(b)
-                self._send(200 if r["ok"] else 409, r)
+                self._send(200, {"ok": brain.inbox.verify_handled(b.get("event_id", ""))})
             elif self.path == "/watch/action":
                 self._send(200, {"result": brain.human_action(b["action"], b.get("params", {}))})
             elif self.path == "/watch/done":

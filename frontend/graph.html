@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nous — memory graph</title>
+<style>
+:root{--bg:#edf4f2;--card:#fff;--line:#dbe8e4;--ink:#16342f;--body:#42605a;--mut:#7b938d;
+--sage:#5ea99d;--sage-soft:#9ccac1;--deep:#17433c;--amber:#c98a2b;--amber-bg:#fdf3df;
+--purple:#6d55c8;--green:#2e7d5b;color-scheme:light;}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);font:14px -apple-system,"Segoe UI",Inter,sans-serif;color:var(--ink);height:100vh;overflow:hidden;}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;background:
+ radial-gradient(700px 400px at 20% 0%,rgba(94,169,157,.13),transparent 60%),
+ radial-gradient(700px 400px at 85% 10%,rgba(94,169,157,.09),transparent 60%);}
+nav{display:flex;align-items:center;gap:16px;padding:16px 26px;position:relative;z-index:2}
+.logo{font-weight:800;font-size:20px;letter-spacing:-.3px;text-decoration:none;color:var(--ink)}
+.navlinks{display:flex;gap:20px;font-weight:600;font-size:13.5px;color:var(--body)}
+.navlinks a{color:inherit;text-decoration:none}
+.navlinks a:hover{color:var(--ink)}
+nav .sp{flex:1}
+.pill{border-radius:999px;padding:9px 18px;font-size:13px;font-weight:700;text-decoration:none;
+background:#fff;border:1px solid var(--line);color:var(--ink)}
+.pill:hover{border-color:var(--sage-soft)}
+#stage{position:relative;z-index:1;height:calc(100vh - 70px);}
+svg{width:100%;height:100%;}
+.edge{stroke-width:1.6;opacity:.5;}
+.nodelabel{font:600 12.5px -apple-system,"Segoe UI",sans-serif;fill:var(--ink);text-anchor:middle;}
+.nodesub{font:700 9.5px -apple-system,sans-serif;text-anchor:middle;letter-spacing:.6px;}
+.legend{position:absolute;bottom:18px;left:22px;background:rgba(255,255,255,.9);border:1px solid var(--line);
+border-radius:14px;padding:10px 14px;font-size:11.5px;color:var(--body);display:flex;gap:14px;z-index:2}
+.legend b{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--mut);font-style:italic;z-index:1}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.pulse{animation:breathe 3s ease-in-out infinite;transform-origin:center;transform-box:fill-box;}
+</style>
+</head>
+<body>
+<nav>
+  <a class="logo" href="/">🧠 Nous</a>
+  <div class="navlinks"><a href="/app">Your brain</a><a href="/console">Console</a></div>
+  <span class="sp"></span>
+  <a class="pill" href="http://localhost:3000" target="_blank">FalkorDB view (sponsor) ↗</a>
+</nav>
+<div id="stage"><svg id="g" viewBox="0 0 1400 760"></svg>
+  <div class="empty" id="empty">memory is empty — go tell Nous something</div></div>
+<div class="legend">
+  <span><b style="background:#17433c"></b>you</span>
+  <span><b style="background:#5ea99d"></b>people</span>
+  <span><b style="background:#c98a2b"></b>promises</span>
+  <span><b style="background:#6d55c8"></b>learned protocols</span>
+  <span><b style="background:#2e7d5b"></b>kept / armed</span>
+</div>
+<script>
+const NS="http://www.w3.org/2000/svg", svg=document.getElementById("g");
+const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
+function el(t,attrs,txt){const e=document.createElementNS(NS,t);
+  for(const k in attrs)e.setAttribute(k,attrs[k]); if(txt!=null)e.textContent=txt; return e;}
+function firstName(s){s=String(s||"");const at=s.indexOf("@");if(at>0)s=s.slice(0,at);
+  return s.split(/[.\s_]/)[0].replace(/^\w/,c=>c.toUpperCase()).slice(0,14);}
+let last="";
+function draw(s){
+  const people=(s.contacts||[]).slice(0,10), commits=s.commitments||[], protos=s.protocols||[];
+  const sig=JSON.stringify([people,commits,protos]);
+  if(sig===last)return; last=sig;
+  document.getElementById("empty").style.display=(people.length+commits.length+protos.length)?"none":"grid";
+  svg.innerHTML="";
+  const CX=700, CY=380;
+  // center: you
+  const owner=(protos[0]&&protos[0].taught_by)||"You";
+  // people around an arc on the left/top
+  const pos={};
+  people.forEach((c,i)=>{
+    const a=Math.PI*(0.25+1.5*i/Math.max(people.length-1,1));
+    pos["c"+i]=[CX+330*Math.cos(a), CY+250*Math.sin(a)];
+  });
+  // draw edges first
+  commits.forEach((c,i)=>{
+    const pi=people.findIndex(p=>firstName(p.name).toLowerCase()===String(c.person||"").toLowerCase().slice(0,firstName(p.name).length));
+    const target=pos["c"+(pi>=0?pi:i%Math.max(people.length,1))]||[CX+330,CY];
+    const mid=[(CX+target[0])/2,(CY+target[1])/2];
+    pos["m"+i]=mid;
+    svg.appendChild(el("line",{class:"edge",x1:CX,y1:CY,x2:mid[0],y2:mid[1],stroke:"#c98a2b"}));
+    svg.appendChild(el("line",{class:"edge",x1:mid[0],y1:mid[1],x2:target[0],y2:target[1],stroke:"#9ccac1"}));
+  });
+  protos.forEach((p,i)=>{
+    const x=CX-160+i*220, y=CY+270; pos["p"+i]=[x,y];
+    svg.appendChild(el("line",{class:"edge",x1:CX,y1:CY,x2:x,y2:y,stroke:"#6d55c8"}));
+  });
+  people.forEach((c,i)=>{
+    const [x,y]=pos["c"+i];
+    svg.appendChild(el("line",{class:"edge",x1:CX,y1:CY,x2:x,y2:y,stroke:"#dbe8e4"}));
+  });
+  // people nodes
+  people.forEach((c,i)=>{
+    const [x,y]=pos["c"+i], g=el("g",{});
+    g.appendChild(el("circle",{cx:x,cy:y,r:16,fill:"#5ea99d",opacity:.92}));
+    g.appendChild(el("text",{class:"nodelabel",x:x,y:y+34},firstName(c.name)));
+    if(c.seen>1)g.appendChild(el("text",{class:"nodesub",x:x,y:y+4,fill:"#fff"},"×"+c.seen));
+    svg.appendChild(g);
+  });
+  // commitment nodes (labeled, colored by status)
+  commits.forEach((c,i)=>{
+    const [x,y]=pos["m"+i]||[CX,CY-120];
+    const col=c.status==="booked"?"#2e7d5b":"#c98a2b";
+    const g=el("g",{});
+    g.appendChild(el("circle",{cx:x,cy:y,r:13,fill:col}));
+    g.appendChild(el("text",{class:"nodelabel",x:x,y:y-20},
+      (c.activity||"plan")+" · "+esc(c.person||"")));
+    g.appendChild(el("text",{class:"nodesub",x:x,y:y+30,fill:col},
+      c.status==="booked"?(c.booked_slot||"BOOKED"):"PROPOSED"));
+    svg.appendChild(g);
+  });
+  // protocol nodes
+  protos.forEach((p,i)=>{
+    const [x,y]=pos["p"+i], col=p.approved?"#2e7d5b":"#6d55c8", g=el("g",{});
+    g.appendChild(el("rect",{x:x-14,y:y-14,width:28,height:28,rx:9,fill:"#6d55c8",opacity:.92}));
+    g.appendChild(el("text",{class:"nodelabel",x:x,y:y+36},esc(p.name).slice(0,28)));
+    g.appendChild(el("text",{class:"nodesub",x:x,y:y+50,fill:col},
+      (p.approved?"ARMED":"PENDING")+" · used "+(p.uses||0)+"×"));
+    svg.appendChild(g);
+  });
+  // center node last
+  const cg=el("g",{class:"pulse"});
+  cg.appendChild(el("circle",{cx:CX,cy:CY,r:30,fill:"#17433c"}));
+  cg.appendChild(el("text",{class:"nodelabel",x:CX,y:CY+52},owner));
+  cg.appendChild(el("text",{x:CX,y:CY+7,"text-anchor":"middle","font-size":"22"},"🧠"));
+  svg.appendChild(cg);
+}
+setInterval(async()=>{try{draw(await (await fetch("/state")).json());}catch(e){}},1500);
+</script>
+</body>
+</html>

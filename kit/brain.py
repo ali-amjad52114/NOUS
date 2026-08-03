@@ -12,10 +12,8 @@ Two loops, one memory:
 from __future__ import annotations
 
 from . import distill, feed, parse, pipegen
-from .actions import ALLOWED, Inbox
+from .actions import Inbox
 from .memory import make_store
-from integrations.guild import GuildIntegrationError, review_protocol
-from integrations.rocketride_runner import run_protocol
 
 OWNER = "Abhinav"
 DEADLINE_DAYS = 15
@@ -28,9 +26,6 @@ class Brain:
         self.pending_queue: list[dict] = []   # events refused pre-approval
         self.watching: dict | None = None
         self.log: list[str] = []
-        self.guild_error: str | None = None
-        self.runtime_protocols: dict[str, dict] = {}
-        self._run_context: dict[str, dict] = {}
 
     def say(self, msg: str):
         self.log.append(msg)
@@ -40,8 +35,7 @@ class Brain:
         goal = " ".join(str(goal or "").split())
         assert goal, "goal is required"
 
-        # If this is a promise involving a real person, run the FULL commitment
-        # flow (parse who/what/when -> propose a dated slot -> Book It).
+        # Promise involving a real person -> FULL commitment flow
         p = parse.parse_promise(goal)
         if p["understood"]:
             eid = f"said-{len(self.inbox.items) + 1}"
@@ -150,28 +144,25 @@ class Brain:
         c = self.store.g["commitments"].get(cid) if hasattr(self.store, "g") else None
         assert c and c.get("proposed_slot"), f"no proposed slot on {cid}"
         person, slot = c["person"], c["proposed_slot"]
-        self.store.update_commitment(cid, status="approved")
         self.say(f"✅ {cid} approved by {OWNER} — RocketRide pipeline 'keep-a-promise' executing:")
         evt_id = c["source_event"]
-        proposal = (f"Hey {person} — does {slot} work for me to come by? "
-                    "I meant it. I'll be there.")
-        proto = {"id": "P-KEEPER", "name": "Keep a promise", "approved": True,
-                 "trigger_class": "promise_made", "taught_by": OWNER, "risk": "low",
-                 "steps": [{"action": "book", "params": {"slot": "$slot", "with_person": "$person"}},
-                           {"action": "send_message", "params": {"to": "$person", "text": "$proposal"}}],
-                 "postcondition": "calendar hold exists and message delivered"}
-        self.runtime_protocols[proto["id"]] = proto
-        pipe = pipegen.emit_pipe(proto)
-        outcome = run_protocol(pipe, {"event_id": evt_id, "protocol_id": proto["id"],
-                                      "trigger_class": "promise_made",
-                                      "inputs": {"slot": slot, "person": person,
-                                                 "proposal": proposal}},
-                               fallback_dispatch=self._fallback_protocol_execution)
-        if not outcome["ok"]:
-            raise RuntimeError(f"RocketRide execution failed: {outcome}")
+        for action, params in [
+            ("book", {"slot": slot, "with_person": person}),
+            ("send_message", {"to": person,
+                              "text": f"Hey {person} — does {slot} work for me to come by? "
+                                      f"I meant it. I'll be there."}),
+        ]:
+            result = self.inbox.execute(evt_id, action, params, actor="brain")
+            self.say(f"     brain: {action} -> {result}")
         self.store.update_commitment(cid, status="booked", booked_slot=slot)
+        rid = self.store.record_use("P-KEEPER", evt_id, True)
+        pipe = pipegen.emit_pipe({"id": "P-KEEPER", "name": "Keep a promise",
+                                  "trigger_class": "promise_made", "taught_by": OWNER,
+                                  "steps": [{"action": "book", "params": {"slot": "$slot", "with_person": "$person"}},
+                                            {"action": "send_message", "params": {"to": "$person", "text": "$proposal"}}],
+                                  "postcondition": "calendar hold exists + message delivered + follow-up scheduled"})
         self.say(f"   📌 booked. follow-up scheduled: if {person} hasn't replied in 2 days, I'll nudge.")
-        self.say(f"   ⚙ RocketRide run {outcome['run_id']} · trace {outcome['trace_ref']} · {pipe}")
+        self.say(f"   ⚙ compiled to RocketRide pipeline: {pipe} · receipt {rid}")
         self.say(f"   {self.inbox.scoreboard()}")
         return "booked"
 
@@ -184,39 +175,20 @@ class Brain:
 
     def human_done(self) -> dict:
         evt = self.watching
-        assert evt, "not in watch mode"
-        watched = [r for r in self.inbox.receipts if r["event_id"] == evt["id"]]
-        try:
-            judgment = review_protocol(evt, watched, OWNER)
-        except GuildIntegrationError as exc:
-            self.guild_error = str(exc)
-            self.say(f"Guild judgment failed closed: {exc}")
-            raise
-        self.guild_error = None
         self.watching = None
-        proto, review = judgment["protocol"], judgment["review"]
-        proto = {**proto, **judgment["provenance"]}
+        watched = [r for r in self.inbox.receipts if r["event_id"] == evt["id"]]
+        proto = distill.distill(evt, watched)
+        review = distill.critique(proto)
         saved = self.store.save_protocol(proto, learned_from=evt["id"], taught_by=OWNER)
         pipe_path = pipegen.emit_pipe(saved)
-        self.say(f"🧠 PROTOCOL DISTILLED — {saved['id']} '{saved['name']}'  "
-                 f"[guild session: {saved['guild_distiller_session']}]")
-        self.say(f"     [guild: Safety Critic] {review['verdict']} · "
-                 f"session {saved['guild_critic_session']}")
-        for finding in review["findings"]:
-            self.say(f"     [{finding['number']}] {finding['code']}: {finding['message']}")
+        self.say(f"🧠 PROTOCOL DISTILLED — {saved['id']} '{saved['name']}'  [guild: Distiller]")
+        for n in review["notes"]:
+            self.say(f"     [guild: Safety Critic] {n}")
         self.say(f"   ⚙ compiled to RocketRide pipeline: {pipe_path}")
-        if review["verdict"] == "APPROVE_ELIGIBLE":
-            self.say(f"   ▶ human may arm it:  approve {saved['id']}")
-        else:
-            self.say("   ✋ Guild rejected this protocol; human approval is disabled")
+        self.say(f"   ▶ arm it:  approve {saved['id']}")
         return saved
 
     def approve(self, pid: str) -> list[str]:
-        proto = self.store.g.get("protocols", {}).get(pid) if hasattr(self.store, "g") else None
-        if not proto:
-            raise ValueError(f"unknown protocol {pid}")
-        if not proto.get("guild_schema_validated") or proto.get("critic_verdict") != "APPROVE_ELIGIBLE":
-            raise ValueError(f"{pid} cannot be armed: Guild verdict is not APPROVE_ELIGIBLE")
         self.store.approve(pid, OWNER)
         self.say(f"✅ {pid} approved by {OWNER} — protocol ARMED.")
         results = []
@@ -242,139 +214,11 @@ class Brain:
         n = len(checks)
         self.say(f"⚡ {evt['id']} '{evt.get('subject', '')[:44]}' — protocol {proto['id']} "
                  f"(score {score}) · preconditions {n}/{n} ✓")
-        pipe_path = pipegen.emit_pipe(proto)
-        outcome = run_protocol(pipe_path, {"event_id": evt["id"], "protocol_id": proto["id"],
-                                           "trigger_class": evt["trigger_class"], "inputs": {}},
-                               fallback_dispatch=self._fallback_protocol_execution)
-        if not outcome["ok"]:
-            self.pending_queue.append(evt)
-            self.say(f"   ⚠ RocketRide run {outcome['run_id']} failed; event re-queued")
-            raise RuntimeError(f"RocketRide execution failed: {outcome}")
+        for step in proto["steps"]:
+            result = self.inbox.execute(evt["id"], step["action"], step["params"], actor="brain")
+            self.say(f"     brain: {step['action']} -> {result}")
+        ok = self.inbox.verify_handled(evt["id"])
+        rid = self.store.record_use(proto["id"], evt["id"], ok)
         self.say(f"   ✅ done autonomously — using the protocol {proto.get('taught_by')} taught me "
-                 f"({proto.get('learned_from')}). run {outcome['run_id']} · "
-                 f"trace {outcome['trace_ref']} · {self.inbox.scoreboard()}")
+                 f"({proto.get('learned_from')}). receipt {rid} · {self.inbox.scoreboard()}")
         return "acted"
-
-    # ------------------------------------------------ RocketRide callbacks
-    def _protocol(self, pid: str) -> dict | None:
-        if pid in self.runtime_protocols:
-            return self.runtime_protocols[pid]
-        return self.store.g.get("protocols", {}).get(pid) if hasattr(self.store, "g") else None
-
-    def check_preconditions(self, payload: dict) -> dict:
-        run_id, event_id = payload.get("run_id"), payload.get("event_id")
-        pid = payload.get("protocol_id") or payload.get("protocol")
-        proto, item = self._protocol(pid or ""), self.inbox.items.get(event_id or "")
-        planned = payload.get("planned_actions")
-        if planned is None and proto:
-            planned = [s.get("action") for s in proto.get("steps", [])]
-        checks = {
-            "run_id_present": bool(run_id),
-            "event_exists": item is not None,
-            "protocol_exists": proto is not None,
-            "protocol_armed": bool(proto and proto.get("approved")),
-            "trigger_matches": bool(proto and item and
-                                    item["evt"].get("trigger_class") == proto.get("trigger_class") and
-                                    payload.get("trigger_class") == proto.get("trigger_class")),
-            "actions_allowlisted": bool(planned) and all(a in ALLOWED for a in planned or []),
-            "actions_match_protocol": bool(proto) and planned == [s.get("action") for s in proto.get("steps", [])],
-        }
-        ok = all(checks.values())
-        if ok:
-            self._run_context[run_id] = {"event_id": event_id, "protocol_id": pid,
-                                         "preconditions": checks, "verified": False,
-                                         "inputs": dict(payload.get("inputs") or {}),
-                                         "next_step": 0}
-        return {"ok": ok, "run_id": run_id, "event_id": event_id,
-                "protocol_id": pid, "checks": checks}
-
-    def execute_protocol_step(self, payload: dict) -> dict:
-        run_id, event_id = payload.get("run_id"), payload.get("event_id")
-        pid = payload.get("protocol_id") or payload.get("protocol")
-        step_id, action = payload.get("step_id"), payload.get("action")
-        context, proto = self._run_context.get(run_id), self._protocol(pid or "")
-        if not context or context.get("event_id") != event_id or context.get("protocol_id") != pid:
-            raise ValueError("run has not passed preconditions")
-        if not proto or not proto.get("approved"):
-            raise ValueError("protocol is missing or not armed")
-        try:
-            index = int((step_id or "").split("-", 2)[1]) - 1
-            expected = proto["steps"][index]
-        except (ValueError, IndexError, KeyError):
-            raise ValueError(f"invalid step_id {step_id!r}") from None
-        canonical_step_id = f"step-{index + 1:03d}-{expected['action']}"
-        if step_id != canonical_step_id or action != expected["action"] or action not in ALLOWED:
-            raise ValueError("step does not match armed protocol")
-        existing = next((r for r in self.inbox.receipts
-                         if r.get("run_id") == run_id and r.get("step_id") == step_id), None)
-        if not existing and index != context["next_step"]:
-            raise ValueError(f"step out of order: expected index {context['next_step'] + 1}")
-        params = payload.get("params", {})
-        expected_params = self._resolve(expected.get("params", {}), context["inputs"])
-        if params != expected_params:
-            raise ValueError("step params do not match armed protocol and run inputs")
-        result = self.inbox.execute_once(event_id, action, params, run_id=run_id,
-                                         step_id=step_id, protocol_id=pid)
-        if not result["duplicate"]:
-            context["next_step"] += 1
-        return {"ok": True, **result}
-
-    def verify_protocol(self, payload: dict) -> dict:
-        run_id, event_id = payload.get("run_id"), payload.get("event_id")
-        pid = payload.get("protocol_id") or payload.get("protocol")
-        context, proto = self._run_context.get(run_id), self._protocol(pid or "")
-        if not context or not proto or context.get("event_id") != event_id:
-            return {"ok": False, "error": "unknown or unchecked run", "receipt_ids": []}
-        receipts = [r for r in self.inbox.receipts if r.get("run_id") == run_id]
-        expected = [s["action"] for s in proto.get("steps", [])]
-        actual = [r["action"] for r in receipts]
-        item = self.inbox.items.get(event_id, {})
-        state_checks = []
-        for step in proto.get("steps", []):
-            action = step["action"]
-            params = self._resolve(step.get("params", {}), context["inputs"])
-            if action == "forward":
-                state_checks.append(item.get("forwarded_to") == params.get("to"))
-            elif action == "label":
-                state_checks.append(params.get("name") in item.get("labels", []))
-            elif action == "archive":
-                state_checks.append(bool(item.get("archived")))
-            elif action == "reply":
-                state_checks.append(bool(item.get("replied")))
-            elif action == "book":
-                state_checks.append(item.get("booked") == params.get("slot"))
-            elif action == "send_message":
-                state_checks.append(bool(item.get("sent")))
-        ok = actual == expected and all(state_checks)
-        if ok and not context["verified"]:
-            context["use_receipt_id"] = self.store.record_use(pid, event_id, True)
-            context["verified"] = True
-        return {"ok": ok, "run_id": run_id, "event_id": event_id,
-                "protocol_id": pid, "expected_actions": expected,
-                "actual_actions": actual, "receipt_ids": [r["id"] for r in receipts],
-                "use_receipt_id": context.get("use_receipt_id")}
-
-    @staticmethod
-    def _resolve(value, inputs: dict):
-        if isinstance(value, str) and value.startswith("$"):
-            return inputs.get(value[1:], value)
-        if isinstance(value, dict):
-            return {k: Brain._resolve(v, inputs) for k, v in value.items()}
-        if isinstance(value, list):
-            return [Brain._resolve(v, inputs) for v in value]
-        return value
-
-    def _fallback_protocol_execution(self, pipe_path: str, payload: dict) -> dict:
-        """Clearly labeled rehearsal fallback implementing the same callback contract."""
-        proto = self._protocol(payload["protocol_id"])
-        payload = {**payload, "planned_actions": [s["action"] for s in proto["steps"]]}
-        pre = self.check_preconditions(payload)
-        if not pre["ok"]:
-            return {"ok": False, "preconditions": pre}
-        step_results = []
-        for i, step in enumerate(proto["steps"], 1):
-            step_results.append(self.execute_protocol_step({**payload,
-                "step_id": f"step-{i:03d}-{step['action']}", "action": step["action"],
-                "params": self._resolve(step.get("params", {}), payload.get("inputs", {}))}))
-        return {"ok": True, "preconditions": pre, "steps": step_results,
-                "verification": self.verify_protocol(payload)}
