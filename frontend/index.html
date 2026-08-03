@@ -1,0 +1,1513 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Nous — Personal brain</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #070b16;
+      --ink-raised: #090f1d;
+      --surface: #0c1425;
+      --surface-strong: #111a2e;
+      --line: #202d49;
+      --line-bright: #354362;
+      --paper: #f5f7fc;
+      --muted: #9ba5b8;
+      --muted-2: #66728a;
+      --amber: #896cff;
+      --amber-soft: #1d1740;
+      --red: #ff6b67;
+      --red-soft: #331923;
+      --green: #48d8bd;
+      --green-soft: #102d31;
+      --blue: #54cde8;
+      --violet: #7c5cff;
+      --cyan: #52d6e7;
+      --gradient: linear-gradient(115deg, var(--violet), var(--cyan));
+      --radius: 16px;
+      --ui-font: "Helvetica Neue", "Neue Haas Grotesk Text Pro", Inter, Arial, sans-serif;
+      --mono-font: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      background: var(--ink);
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 72% -18%, rgba(124, 92, 255, 0.16), transparent 34rem),
+        radial-gradient(circle at -8% 86%, rgba(82, 214, 231, 0.08), transparent 30rem),
+        var(--ink);
+      color: var(--paper);
+      font-family: var(--ui-font);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button,
+    a {
+      font: inherit;
+    }
+
+    button {
+      color: inherit;
+    }
+
+    button:focus-visible,
+    a:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 3px;
+    }
+
+    .app-header {
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 22px;
+      border-bottom: 1px solid rgba(63, 79, 119, 0.42);
+      background: rgba(7, 11, 22, 0.72);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      font-size: 29px;
+      font-weight: 690;
+      letter-spacing: -0.04em;
+    }
+
+    .brand-mark {
+      width: 33px;
+      height: 33px;
+      flex: 0 0 auto;
+      filter: drop-shadow(0 0 9px rgba(124, 92, 255, 0.25));
+    }
+
+    .connection {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 560;
+    }
+
+    .connection-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--violet);
+      box-shadow: 0 0 0 4px rgba(124, 92, 255, 0.1);
+    }
+
+    .connection[data-state="online"] {
+      color: #72e6d0;
+    }
+
+    .connection[data-state="online"] .connection-dot {
+      background: var(--cyan);
+      box-shadow: 0 0 0 4px rgba(82, 214, 231, 0.1), 0 0 12px rgba(82, 214, 231, 0.48);
+    }
+
+    .connection[data-state="offline"] {
+      color: var(--red);
+    }
+
+    .connection[data-state="offline"] .connection-dot {
+      background: var(--red);
+      box-shadow: 0 0 0 4px rgba(239, 105, 97, 0.1);
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: minmax(290px, 0.86fr) minmax(500px, 1.52fr) minmax(310px, 0.94fr);
+      gap: 8px;
+      height: calc(100vh - 64px);
+      padding: 0 8px 8px;
+    }
+
+    .panel {
+      min-width: 0;
+      min-height: 0;
+      background:
+        radial-gradient(circle at 88% -15%, rgba(82, 214, 231, 0.035), transparent 18rem),
+        linear-gradient(145deg, rgba(124, 92, 255, 0.025), transparent 42%),
+        var(--ink-raised);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 18px 55px rgba(0, 0, 0, 0.16);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 25px 24px 20px;
+    }
+
+    .panel-title {
+      margin: 0;
+      color: var(--paper);
+      font-size: clamp(28px, 2.25vw, 39px);
+      font-weight: 680;
+      letter-spacing: -0.045em;
+      line-height: 1;
+    }
+
+    .panel-count {
+      color: #aeb8cb;
+      font-family: var(--mono-font);
+      font-size: 12px;
+    }
+
+    .story-panel {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+    }
+
+    .event-list {
+      display: grid;
+      align-content: start;
+      gap: 9px;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 0 17px 14px;
+      position: relative;
+      scrollbar-color: var(--line-bright) transparent;
+      scrollbar-width: thin;
+    }
+
+    .event-list::before {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      top: 34px;
+      bottom: 44px;
+      left: 49px;
+      width: 2px;
+      border-radius: 99px;
+      background: linear-gradient(180deg, #5c6b8d 0%, var(--violet) 43%, var(--cyan) 100%);
+      box-shadow: 0 0 16px rgba(124, 92, 255, 0.3);
+      opacity: 0.82;
+    }
+
+    .event-card {
+      position: relative;
+      display: grid;
+      grid-template-columns: 36px minmax(0, 1fr);
+      gap: 13px;
+      padding: 14px 15px 14px 13px;
+      min-height: 105px;
+      z-index: 1;
+      background: rgba(8, 14, 29, 0.92);
+      border: 1px solid #2b3857;
+      border-radius: var(--radius);
+      transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+    }
+
+    .event-card[data-state="next"] {
+      background: linear-gradient(105deg, rgba(124, 92, 255, 0.14), rgba(82, 214, 231, 0.055) 72%);
+      border-color: var(--cyan);
+      box-shadow: inset 3px 0 0 var(--violet), 0 0 24px rgba(82, 214, 231, 0.09);
+    }
+
+    .event-card[data-state="sent"] {
+      opacity: 0.68;
+      border-color: var(--line);
+    }
+
+    .event-card[data-state="sent"] .event-step::after {
+      background: #6285bd;
+    }
+
+    .event-card[data-state="next"] .event-step::after {
+      background: #b09bff;
+      box-shadow: 0 0 0 4px rgba(124, 92, 255, 0.22), 0 0 15px rgba(124, 92, 255, 0.68);
+    }
+
+    .event-step {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      padding-top: 2px;
+      border-right: 1px solid rgba(109, 127, 170, 0.45);
+      color: var(--muted);
+      font-family: var(--mono-font);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .event-step::after {
+      content: "";
+      position: absolute;
+      top: 29px;
+      right: -4px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #64708a;
+    }
+
+    .event-main {
+      min-width: 0;
+    }
+
+    .event-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .event-person {
+      overflow: hidden;
+      color: #dbe0eb;
+      font-size: 14px;
+      font-weight: 610;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .event-channel {
+      flex: 0 0 auto;
+      font-family: var(--mono-font);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .event-subject {
+      display: -webkit-box;
+      overflow: hidden;
+      margin: 0;
+      color: var(--paper);
+      font-size: 15px;
+      font-weight: 530;
+      line-height: 1.25;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    .event-id {
+      margin-top: 8px;
+      color: #75829d;
+      font-family: var(--mono-font);
+      font-size: 10px;
+    }
+
+    .story-footer {
+      padding: 12px 17px 17px;
+      background: linear-gradient(180deg, transparent, var(--ink-raised) 20%);
+    }
+
+    .primary-button,
+    .semantic-action,
+    .watch-action,
+    .approve-button {
+      border: 0;
+      border-radius: 11px;
+      cursor: pointer;
+      transition: filter 150ms ease, transform 150ms ease, background 150ms ease, border-color 150ms ease;
+    }
+
+    .primary-button:hover,
+    .semantic-action:hover,
+    .approve-button:hover {
+      filter: brightness(1.08);
+    }
+
+    .primary-button:active,
+    .semantic-action:active,
+    .watch-action:active,
+    .approve-button:active {
+      transform: translateY(1px);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      filter: grayscale(0.6);
+      opacity: 0.46;
+    }
+
+    .primary-button {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      min-height: 66px;
+      padding: 0 21px;
+      background: var(--gradient);
+      color: #ffffff;
+      font-size: 20px;
+      font-weight: 720;
+      letter-spacing: -0.02em;
+      box-shadow: 0 11px 28px rgba(92, 84, 255, 0.18);
+    }
+
+    .button-arrow {
+      width: 23px;
+      height: 23px;
+      stroke-width: 1.8;
+    }
+
+    .feed-panel {
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+    }
+
+    .goal-composer {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(150px, 0.66fr) minmax(280px, 1.34fr);
+      align-items: center;
+      gap: 16px;
+      margin: 0 20px 15px;
+      padding: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(124, 92, 255, 0.62);
+      border-radius: 14px;
+      background:
+        radial-gradient(circle at 92% -25%, rgba(82, 214, 231, 0.12), transparent 13rem),
+        rgba(12, 20, 40, 0.94);
+      box-shadow: inset 0 0 26px rgba(124, 92, 255, 0.04), 0 0 28px rgba(124, 92, 255, 0.05);
+    }
+
+    .goal-composer::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 14px;
+      left: 14px;
+      height: 1px;
+      background: var(--gradient);
+      opacity: 0.72;
+    }
+
+    .goal-copy {
+      min-width: 0;
+    }
+
+    .goal-label {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--paper);
+      font-size: 17px;
+      font-weight: 690;
+      letter-spacing: -0.025em;
+    }
+
+    .goal-hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .goal-entry {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .goal-input {
+      min-width: 0;
+      min-height: 49px;
+      padding: 0 14px;
+      border: 1px solid #354565;
+      border-radius: 10px;
+      outline: none;
+      background: #080e1c;
+      color: var(--paper);
+      font-family: var(--ui-font);
+      font-size: 14px;
+      transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .goal-input::placeholder {
+      color: #69758d;
+    }
+
+    .goal-input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 3px rgba(82, 214, 231, 0.1);
+    }
+
+    .goal-submit {
+      min-height: 49px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--gradient);
+      color: #ffffff;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 720;
+      white-space: nowrap;
+      box-shadow: 0 9px 22px rgba(91, 92, 255, 0.18);
+      transition: filter 150ms ease, transform 150ms ease;
+    }
+
+    .goal-submit:hover {
+      filter: brightness(1.08);
+    }
+
+    .goal-submit:active {
+      transform: translateY(1px);
+    }
+
+    .feed-status {
+      color: var(--muted);
+      font-family: var(--mono-font);
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .feed-status::after {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      margin-left: 9px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 9px rgba(82, 214, 231, 0.8);
+      vertical-align: 1px;
+    }
+
+    .feed-list {
+      min-height: 0;
+      overflow-y: auto;
+      padding: 0 20px 18px;
+      scroll-behavior: smooth;
+      scrollbar-color: var(--line-bright) transparent;
+      scrollbar-width: thin;
+    }
+
+    .feed-line {
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr);
+      gap: 11px;
+      padding: 7px 4px;
+      color: #bdc6d8;
+      font-family: var(--mono-font);
+      font-size: 12px;
+      line-height: 1.48;
+      overflow-wrap: anywhere;
+      animation: feed-in 220ms ease both;
+    }
+
+    .feed-index {
+      color: #596780;
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .feed-card {
+      position: relative;
+      margin: 9px 0;
+      padding: 22px 20px;
+      border: 1px solid currentColor;
+      border-radius: 14px;
+      overflow: hidden;
+      animation: feed-in 220ms ease both;
+    }
+
+    .feed-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(110deg, currentColor, transparent 52%);
+      opacity: 0.08;
+    }
+
+    .feed-card[data-tone="promise"] {
+      color: #947cff;
+      background: rgba(29, 23, 64, 0.42);
+      box-shadow: inset 0 0 26px rgba(124, 92, 255, 0.035);
+    }
+
+    .feed-card[data-tone="plan"] {
+      color: #a18cff;
+      background: rgba(29, 23, 64, 0.42);
+    }
+
+    .feed-card[data-tone="slot"] {
+      color: var(--cyan);
+      background: rgba(12, 40, 52, 0.4);
+    }
+
+    .feed-card[data-tone="refusing"] {
+      color: var(--red);
+      background: rgba(51, 25, 35, 0.38);
+    }
+
+    .feed-card[data-tone="done"] {
+      color: var(--green);
+      background: rgba(16, 45, 49, 0.4);
+    }
+
+    .feed-card-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .feed-card-copy {
+      min-width: 0;
+    }
+
+    .feed-card-label {
+      margin: 0 0 7px;
+      font-size: clamp(20px, 1.6vw, 26px);
+      font-weight: 730;
+      letter-spacing: 0.03em;
+      line-height: 1.03;
+    }
+
+    .feed-card-line {
+      margin: 0;
+      color: #d8deea;
+      font-family: var(--mono-font);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    .semantic-action {
+      flex: 0 0 auto;
+      min-width: 105px;
+      min-height: 48px;
+      padding: 0 18px;
+      background: var(--gradient);
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 720;
+      box-shadow: 0 9px 22px rgba(91, 92, 255, 0.2);
+    }
+
+    .watch-tray {
+      margin: 0 14px 14px;
+      padding: 13px;
+      border: 1px solid rgba(82, 214, 231, 0.72);
+      border-radius: 14px;
+      background: rgba(8, 17, 33, 0.94);
+      box-shadow: 0 0 28px rgba(82, 214, 231, 0.06);
+    }
+
+    .watch-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .watch-title {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 620;
+      letter-spacing: -0.02em;
+    }
+
+    .watch-pulse {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--cyan);
+      font-family: var(--mono-font);
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .watch-pulse::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .watch-actions {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .watch-action {
+      min-height: 53px;
+      padding: 8px 10px;
+      background: transparent;
+      border: 1px solid #3a486a;
+      color: var(--paper);
+      font-size: 12px;
+      font-weight: 590;
+    }
+
+    .watch-action:hover {
+      background: var(--surface-strong);
+      border-color: #6677a1;
+    }
+
+    .watch-action[data-kind="done"] {
+      border-color: transparent;
+      background: var(--gradient);
+      color: #ffffff;
+    }
+
+    .score-panel {
+      display: grid;
+      grid-template-rows: auto auto 1px minmax(0, 1fr) auto;
+    }
+
+    .scoreboard {
+      display: grid;
+      grid-template-columns: 1fr 1px 1fr;
+      align-items: stretch;
+      min-height: 188px;
+      padding: 8px 20px 24px;
+    }
+
+    .score-divider {
+      background: var(--line-bright);
+    }
+
+    .score {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+      padding: 0 8px;
+    }
+
+    .score-label {
+      margin-bottom: 2px;
+      color: #d8d4cb;
+      font-family: var(--mono-font);
+      font-size: 14px;
+      font-weight: 680;
+      letter-spacing: 0.08em;
+    }
+
+    .score-value {
+      color: var(--paper);
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-size: clamp(70px, 7.2vw, 112px);
+      font-weight: 410;
+      letter-spacing: -0.09em;
+      line-height: 0.94;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .section-rule {
+      margin: 0 17px;
+      background: var(--line);
+    }
+
+    .graph-section {
+      min-height: 0;
+      overflow-y: auto;
+      padding: 24px 21px 12px;
+      scrollbar-color: var(--line-bright) transparent;
+      scrollbar-width: thin;
+    }
+
+    .graph-title {
+      margin: 0 0 20px;
+      font-size: clamp(24px, 2vw, 31px);
+      font-weight: 630;
+      letter-spacing: -0.04em;
+    }
+
+    .graph-lines {
+      display: grid;
+      gap: 9px;
+      color: #bcc6d8;
+      font-family: var(--mono-font);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .graph-line {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .graph-raw {
+      min-width: 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .chip {
+      flex: 0 0 auto;
+      margin-top: -1px;
+      padding: 3px 7px;
+      border: 1px solid currentColor;
+      border-radius: 6px;
+      font-size: 8px;
+      font-weight: 720;
+      letter-spacing: 0.08em;
+    }
+
+    .chip[data-tone="armed"] {
+      color: var(--green);
+      background: rgba(72, 216, 189, 0.07);
+    }
+
+    .chip[data-tone="pending"] {
+      color: #a38eff;
+      background: rgba(124, 92, 255, 0.08);
+    }
+
+    .score-footer {
+      padding: 12px 17px 19px;
+      background: linear-gradient(180deg, transparent, var(--ink-raised) 18%);
+    }
+
+    .approve-button {
+      width: 100%;
+      min-height: 62px;
+      margin-bottom: 14px;
+      background: var(--gradient);
+      color: #ffffff;
+      font-size: 18px;
+      font-weight: 720;
+      box-shadow: 0 11px 28px rgba(92, 84, 255, 0.18);
+    }
+
+    .graph-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      min-height: 35px;
+      color: #9d89ff;
+      font-size: 14px;
+      font-weight: 520;
+      text-decoration: none;
+    }
+
+    .graph-link:hover {
+      color: var(--paper);
+      text-decoration: underline;
+      text-underline-offset: 4px;
+    }
+
+    .graph-link svg {
+      width: 15px;
+      height: 15px;
+    }
+
+    .toast {
+      position: fixed;
+      z-index: 20;
+      right: 22px;
+      bottom: 22px;
+      max-width: min(390px, calc(100vw - 44px));
+      padding: 13px 16px;
+      border: 1px solid var(--line-bright);
+      border-radius: 12px;
+      background: #10182a;
+      color: var(--paper);
+      font-size: 13px;
+      line-height: 1.4;
+      box-shadow: 0 14px 35px rgba(0, 0, 0, 0.46), 0 0 24px rgba(124, 92, 255, 0.08);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(9px);
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+
+    .toast[data-open="true"] {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast[data-tone="error"] {
+      border-color: rgba(239, 105, 97, 0.62);
+      color: #ffd3d0;
+    }
+
+    @keyframes feed-in {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 1160px) {
+      body {
+        overflow: auto;
+      }
+
+      .app-shell {
+        grid-template-columns: minmax(280px, 0.85fr) minmax(480px, 1.4fr);
+        height: auto;
+        min-height: calc(100vh - 64px);
+      }
+
+      .story-panel,
+      .feed-panel {
+        height: calc(100vh - 72px);
+      }
+
+      .score-panel {
+        grid-column: 1 / -1;
+        min-height: 670px;
+      }
+
+      .score-value {
+        font-size: clamp(92px, 15vw, 160px);
+      }
+
+      .watch-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .goal-composer {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 780px) {
+      .app-header {
+        height: 61px;
+        padding: 0 17px;
+      }
+
+      .brand {
+        font-size: 25px;
+      }
+
+      .brand-mark {
+        width: 29px;
+        height: 29px;
+      }
+
+      .connection span:last-child {
+        display: none;
+      }
+
+      .app-shell {
+        display: block;
+        min-height: calc(100vh - 61px);
+        padding: 4px;
+      }
+
+      .panel {
+        margin-bottom: 4px;
+      }
+
+      .story-panel,
+      .feed-panel {
+        height: auto;
+        min-height: 610px;
+      }
+
+      .story-panel {
+        grid-template-rows: auto auto auto;
+      }
+
+      .event-list {
+        max-height: 520px;
+      }
+
+      .feed-list {
+        min-height: 500px;
+        max-height: 70vh;
+      }
+
+      .goal-composer {
+        margin-right: 13px;
+        margin-left: 13px;
+      }
+
+      .panel-header {
+        padding: 21px 19px 17px;
+      }
+
+      .panel-title {
+        font-size: 31px;
+      }
+
+      .watch-actions {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .score-panel {
+        min-height: 650px;
+      }
+    }
+
+    @media (max-width: 460px) {
+      .goal-entry {
+        grid-template-columns: 1fr;
+      }
+
+      .goal-submit {
+        width: 100%;
+      }
+
+      .event-card {
+        min-height: 98px;
+      }
+
+      .feed-list {
+        padding-right: 13px;
+        padding-left: 13px;
+      }
+
+      .feed-card-content {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .semantic-action {
+        width: 100%;
+      }
+
+      .scoreboard {
+        min-height: 155px;
+        padding-right: 10px;
+        padding-left: 10px;
+      }
+
+      .score-value {
+        font-size: 68px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand" aria-label="Nous">
+      <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true">
+        <defs>
+          <linearGradient id="nous-mark-gradient" x1="4" y1="5" x2="31" y2="31" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#7c5cff"></stop>
+            <stop offset="1" stop-color="#52d6e7"></stop>
+          </linearGradient>
+        </defs>
+        <g fill="none" stroke="url(#nous-mark-gradient)" stroke-width="2">
+          <ellipse cx="14.5" cy="18" rx="11" ry="7.2" transform="rotate(-31 14.5 18)"></ellipse>
+          <ellipse cx="21.5" cy="18" rx="11" ry="7.2" transform="rotate(31 21.5 18)"></ellipse>
+          <ellipse cx="18" cy="22" rx="10.5" ry="7" transform="rotate(4 18 22)"></ellipse>
+        </g>
+      </svg>
+      <span>Nous</span>
+    </div>
+    <div class="connection" id="connection" data-state="connecting" role="status" aria-live="polite">
+      <span class="connection-dot" aria-hidden="true"></span>
+      <span id="connection-label">Connecting</span>
+      <span>· Brain service</span>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <section class="panel story-panel" aria-labelledby="story-title">
+      <div class="panel-header">
+        <h1 class="panel-title" id="story-title">Story</h1>
+        <span class="panel-count" id="story-count">01 / 06</span>
+      </div>
+      <div class="event-list" id="event-list"></div>
+      <div class="story-footer">
+        <button class="primary-button" id="next-event" type="button">
+          <span>Next event</span>
+          <svg class="button-arrow" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 12h15M14 6l6 6-6 6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <section class="panel feed-panel" aria-labelledby="feed-title">
+      <div class="panel-header">
+        <h2 class="panel-title" id="feed-title">Live feed</h2>
+        <span class="feed-status">Polling · 1 sec</span>
+      </div>
+      <form class="goal-composer" id="goal-form">
+        <div class="goal-copy">
+          <label class="goal-label" for="goal-input">What do you want to do?</label>
+          <p class="goal-hint">Nous works out the steps and protects the best available time.</p>
+        </div>
+        <div class="goal-entry">
+          <input class="goal-input" id="goal-input" name="goal" type="text" maxlength="160"
+                 autocomplete="off" placeholder="Visit Sam before chemo starts" required>
+          <button class="goal-submit" id="goal-submit" type="submit">Find the best time</button>
+        </div>
+      </form>
+      <div class="feed-list" id="feed-list" aria-live="polite" aria-relevant="additions text"></div>
+      <div class="watch-tray" id="watch-tray" hidden>
+        <div class="watch-header">
+          <h3 class="watch-title" id="watch-title">Watching</h3>
+          <span class="watch-pulse">Learning</span>
+        </div>
+        <div class="watch-actions" id="watch-actions"></div>
+      </div>
+    </section>
+
+    <aside class="panel score-panel" aria-labelledby="score-title">
+      <div class="panel-header">
+        <h2 class="panel-title" id="score-title">Scoreboard</h2>
+      </div>
+      <div class="scoreboard" aria-label="You versus brain action totals">
+        <div class="score">
+          <span class="score-label">YOU</span>
+          <span class="score-value" id="you-score">00</span>
+        </div>
+        <span class="score-divider" aria-hidden="true"></span>
+        <div class="score">
+          <span class="score-label">BRAIN</span>
+          <span class="score-value" id="brain-score">00</span>
+        </div>
+      </div>
+      <div class="section-rule" aria-hidden="true"></div>
+      <section class="graph-section" aria-labelledby="graph-title">
+        <h3 class="graph-title" id="graph-title">Protocol graph</h3>
+        <div class="graph-lines" id="graph-lines"></div>
+      </section>
+      <div class="score-footer">
+        <button class="approve-button" id="approve-protocol" type="button">Approve P-001</button>
+        <a class="graph-link" href="http://localhost:3000" target="_blank" rel="noreferrer">
+          <span>Open graph explorer</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 5h10v10M19 5 7 17M5 9v10h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </a>
+      </div>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script id="story-data" type="application/json">[
+    {"id":"evt-1","type":"message_in","channel":"gmail","from":"sam.k@gmail.com","person":"Sam","subject":"moving to London","body":"Hey man — it's official, I'm moving to London. Flight's on the 18th. Feels like we barely got to hang out this year."},
+    {"id":"evt-2","type":"message_out","channel":"gmail","to":"sam.k@gmail.com","person":"Sam","subject":"re: moving to London","body":"No way! I'm coming to see you before you go, I promise. Not missing this one."},
+    {"id":"evt-3","type":"message_in","channel":"gmail","from":"billing@acmedesign.co","person":"Acme Design","subject":"Invoice #4417 — due Aug 17","body":"Please find attached invoice for $850.","attachment":"invoice_4417.pdf"},
+    {"id":"evt-4","type":"message_in","channel":"slack","from":"newsletter@technews.io","person":"TechNews","subject":"Your Monday briefing","body":"Top stories in AI this week..."},
+    {"id":"evt-5","type":"message_in","channel":"gmail","from":"invoices@cloudhost.com","person":"CloudHost","subject":"CloudHost invoice CH-2231 for July","body":"Amount due: $120. Invoice attached.","attachment":"CH-2231.pdf"},
+    {"id":"evt-6","type":"message_in","channel":"gmail","from":"accounts@metroutilities.com","person":"Metro Utilities","subject":"Metro Utilities — invoice 88213","body":"Your monthly invoice of $96 is attached.","attachment":"88213.pdf"}
+  ]</script>
+  <script id="action-contracts" type="application/json">{
+    "watchActions":[
+      {"label":"Forward","body":{"action":"forward","params":{"to":"accounting@myfirm.com"}}},
+      {"label":"Label invoices","body":{"action":"label","params":{"name":"invoices"}}},
+      {"label":"Archive","body":{"action":"archive","params":{}}}
+    ],
+    "watchDone":{},
+    "approveProtocol":{"protocol_id":"P-001"},
+    "approveCommitment":{"commitment_id":"C-001"}
+  }</script>
+  <script>
+    (function () {
+      "use strict";
+
+      var API_BASE = "http://127.0.0.1:7200";
+      var story = JSON.parse(document.getElementById("story-data").textContent);
+      var contracts = JSON.parse(document.getElementById("action-contracts").textContent);
+      var storyIndex = Math.min(
+        Math.max(Number(sessionStorage.getItem("nousStoryIndex") || 0), 0),
+        story.length
+      );
+      var dashboardState = {
+        log: [],
+        scoreboard: "",
+        graph: "",
+        pending_queue: [],
+        watching: null
+      };
+      var logSignature = "";
+      var pollInFlight = false;
+      var toastTimer = 0;
+
+      var eventList = document.getElementById("event-list");
+      var storyCount = document.getElementById("story-count");
+      var nextEventButton = document.getElementById("next-event");
+      var goalForm = document.getElementById("goal-form");
+      var goalInput = document.getElementById("goal-input");
+      var goalSubmit = document.getElementById("goal-submit");
+      var feedList = document.getElementById("feed-list");
+      var watchTray = document.getElementById("watch-tray");
+      var watchTitle = document.getElementById("watch-title");
+      var watchActions = document.getElementById("watch-actions");
+      var graphLines = document.getElementById("graph-lines");
+      var approveProtocolButton = document.getElementById("approve-protocol");
+      var connection = document.getElementById("connection");
+      var connectionLabel = document.getElementById("connection-label");
+      var toast = document.getElementById("toast");
+
+      function pad(value) {
+        return String(value).padStart(2, "0");
+      }
+
+      function showToast(message, tone) {
+        window.clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.dataset.tone = tone || "default";
+        toast.dataset.open = "true";
+        toastTimer = window.setTimeout(function () {
+          toast.dataset.open = "false";
+        }, 2600);
+      }
+
+      function setConnection(state) {
+        connection.dataset.state = state;
+        connectionLabel.textContent =
+          state === "online" ? "Live" :
+          state === "offline" ? "Offline" :
+          "Connecting";
+      }
+
+      function renderStory() {
+        var fragment = document.createDocumentFragment();
+
+        story.forEach(function (event, index) {
+          var card = document.createElement("article");
+          var step = document.createElement("div");
+          var main = document.createElement("div");
+          var meta = document.createElement("div");
+          var person = document.createElement("span");
+          var channel = document.createElement("span");
+          var subject = document.createElement("p");
+          var id = document.createElement("div");
+
+          card.className = "event-card";
+          card.dataset.state = index < storyIndex ? "sent" : index === storyIndex ? "next" : "queued";
+
+          step.className = "event-step";
+          step.textContent = pad(index + 1);
+
+          main.className = "event-main";
+          meta.className = "event-meta";
+          person.className = "event-person";
+          person.textContent = event.person || event.from || event.to || "Unknown";
+          channel.className = "event-channel";
+          channel.textContent = event.channel;
+          subject.className = "event-subject";
+          subject.textContent = event.subject;
+          id.className = "event-id";
+          id.textContent = event.id + (index < storyIndex ? " · sent" : "");
+
+          meta.append(person, channel);
+          main.append(meta, subject, id);
+          card.append(step, main);
+          fragment.append(card);
+        });
+
+        eventList.replaceChildren(fragment);
+        storyCount.textContent = storyIndex >= story.length
+          ? pad(story.length) + " / " + pad(story.length)
+          : pad(storyIndex + 1) + " / " + pad(story.length);
+        nextEventButton.disabled = storyIndex >= story.length;
+        nextEventButton.querySelector("span").textContent =
+          storyIndex >= story.length ? "Story complete" : "Next event";
+      }
+
+      function semanticTone(line) {
+        if (/PLAN READY/i.test(line)) return "plan";
+        if (/BEST SLOT/i.test(line)) return "slot";
+        if (/PROMISE DETECTED/i.test(line)) return "promise";
+        if (/REFUSING/i.test(line)) return "refusing";
+        if (/done autonomously/i.test(line)) return "done";
+        return "";
+      }
+
+      function semanticLabel(tone) {
+        if (tone === "plan") return "PLAN READY";
+        if (tone === "slot") return "BEST SLOT";
+        if (tone === "promise") return "PROMISE DETECTED";
+        if (tone === "refusing") return "REFUSING";
+        return "done autonomously";
+      }
+
+      function renderFeed(log) {
+        var wasNearBottom = feedList.scrollHeight - feedList.scrollTop - feedList.clientHeight < 90;
+        var fragment = document.createDocumentFragment();
+
+        log.forEach(function (line, index) {
+          var tone = semanticTone(line);
+
+          if (tone) {
+            var card = document.createElement("article");
+            var content = document.createElement("div");
+            var copy = document.createElement("div");
+            var label = document.createElement("h3");
+            var body = document.createElement("p");
+
+            card.className = "feed-card";
+            card.dataset.tone = tone;
+            content.className = "feed-card-content";
+            copy.className = "feed-card-copy";
+            label.className = "feed-card-label";
+            label.textContent = semanticLabel(tone);
+            body.className = "feed-card-line";
+            body.textContent = line;
+            copy.append(label, body);
+            content.append(copy);
+
+            if (tone === "promise") {
+              var bookButton = document.createElement("button");
+              bookButton.type = "button";
+              bookButton.className = "semantic-action";
+              bookButton.textContent = "Book it";
+              bookButton.addEventListener("click", function () {
+                runMutation(
+                  "/approve-commitment",
+                  contracts.approveCommitment,
+                  bookButton,
+                  "Commitment C-001 booked"
+                );
+              });
+              content.append(bookButton);
+            }
+
+            card.append(content);
+            fragment.append(card);
+            return;
+          }
+
+          var row = document.createElement("div");
+          var count = document.createElement("span");
+          var text = document.createElement("span");
+          row.className = "feed-line";
+          count.className = "feed-index";
+          count.textContent = pad(index + 1);
+          text.textContent = line;
+          row.append(count, text);
+          fragment.append(row);
+        });
+
+        feedList.replaceChildren(fragment);
+        if (wasNearBottom || log.length <= 5) {
+          var scrollToLatest = function () {
+            feedList.scrollTop = feedList.scrollHeight;
+          };
+          window.requestAnimationFrame(scrollToLatest);
+          window.setTimeout(scrollToLatest, 260);
+        }
+      }
+
+      function parseScoreboard(scoreboard) {
+        var you = scoreboard.match(/you:\s*(\d+)/i);
+        var brain = scoreboard.match(/brain:\s*(\d+)/i);
+        document.getElementById("you-score").textContent = pad(you ? you[1] : 0);
+        document.getElementById("brain-score").textContent = pad(brain ? brain[1] : 0);
+      }
+
+      function renderGraph(graph) {
+        var fragment = document.createDocumentFragment();
+
+        String(graph || "").split("\n").filter(Boolean).forEach(function (line) {
+          var row = document.createElement("div");
+          var raw = document.createElement("span");
+          var pending = /PENDING(?: APPROVAL)?/i.test(line);
+          var armed = /\bARMED\b/i.test(line);
+          var chip = null;
+
+          row.className = "graph-line";
+          raw.className = "graph-raw";
+          raw.textContent = line.replace(/\s*\[(?:ARMED|PENDING APPROVAL)\]\s*/i, "");
+          row.append(raw);
+
+          if (armed || pending) {
+            chip = document.createElement("span");
+            chip.className = "chip";
+            chip.dataset.tone = armed ? "armed" : "pending";
+            chip.textContent = armed ? "ARMED" : "PENDING";
+            row.append(chip);
+          }
+
+          fragment.append(row);
+        });
+
+        graphLines.replaceChildren(fragment);
+      }
+
+      function renderWatch(watching) {
+        if (!watching) {
+          watchTray.hidden = true;
+          watchActions.replaceChildren();
+          return;
+        }
+
+        watchTray.hidden = false;
+        watchTitle.textContent = "Watching " + watching;
+        var fragment = document.createDocumentFragment();
+
+        contracts.watchActions.forEach(function (action) {
+          var button = document.createElement("button");
+          button.type = "button";
+          button.className = "watch-action";
+          button.textContent = action.label;
+          button.addEventListener("click", function () {
+            runMutation("/watch/action", action.body, button, action.label + " complete");
+          });
+          fragment.append(button);
+        });
+
+        var doneButton = document.createElement("button");
+        doneButton.type = "button";
+        doneButton.className = "watch-action";
+        doneButton.dataset.kind = "done";
+        doneButton.textContent = "Done";
+        doneButton.addEventListener("click", function () {
+          runMutation("/watch/done", contracts.watchDone, doneButton, "Protocol distilled");
+        });
+        fragment.append(doneButton);
+        watchActions.replaceChildren(fragment);
+      }
+
+      function renderState(nextState) {
+        dashboardState = nextState;
+        var nextLogSignature = JSON.stringify(nextState.log || []);
+        if (nextLogSignature !== logSignature) {
+          logSignature = nextLogSignature;
+          renderFeed(nextState.log || []);
+        }
+        parseScoreboard(nextState.scoreboard || "");
+        renderGraph(nextState.graph || "");
+        renderWatch(nextState.watching);
+      }
+
+      async function post(path, body) {
+        var response = await fetch(API_BASE + path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        var payload = await response.json().catch(function () { return {}; });
+        if (!response.ok) {
+          throw new Error(payload.error || "Request failed");
+        }
+        return payload;
+      }
+
+      async function pollState() {
+        if (pollInFlight) return;
+        pollInFlight = true;
+        try {
+          var response = await fetch(API_BASE + "/state", { cache: "no-store" });
+          if (!response.ok) throw new Error("State request failed");
+          var state = await response.json();
+          renderState(state);
+          setConnection("online");
+        } catch (error) {
+          setConnection("offline");
+        } finally {
+          pollInFlight = false;
+        }
+      }
+
+      async function runMutation(path, body, button, successMessage) {
+        button.disabled = true;
+        try {
+          await post(path, body);
+          showToast(successMessage);
+          await pollState();
+        } catch (error) {
+          showToast(error.message, "error");
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      goalForm.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        var goal = goalInput.value.trim();
+        if (!goal) {
+          showToast("Tell Nous what you want to do", "error");
+          goalInput.focus();
+          return;
+        }
+
+        goalSubmit.disabled = true;
+        try {
+          var result = await post("/goals", { goal: goal });
+          goalInput.value = "";
+          showToast("Best time: " + result.slot);
+          await pollState();
+        } catch (error) {
+          showToast(error.message, "error");
+        } finally {
+          goalSubmit.disabled = false;
+        }
+      });
+
+      nextEventButton.addEventListener("click", async function () {
+        if (storyIndex >= story.length) return;
+        nextEventButton.disabled = true;
+        try {
+          await post("/events", story[storyIndex]);
+          storyIndex += 1;
+          sessionStorage.setItem("nousStoryIndex", String(storyIndex));
+          renderStory();
+          await pollState();
+        } catch (error) {
+          showToast(error.message, "error");
+          nextEventButton.disabled = false;
+        }
+      });
+
+      approveProtocolButton.addEventListener("click", function () {
+        runMutation(
+          "/approve",
+          contracts.approveProtocol,
+          approveProtocolButton,
+          "Protocol P-001 armed"
+        );
+      });
+
+      renderStory();
+      pollState();
+      window.setInterval(pollState, 1000);
+    }());
+  </script>
+</body>
+</html>

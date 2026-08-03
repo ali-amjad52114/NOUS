@@ -6,6 +6,7 @@ call back into /actions/execute so the ENGINE is the execution path.
     python3 server.py          # -> http://127.0.0.1:7200
 
   POST /events            {event json}           -> brain ingests (watch/refuse/act)
+  POST /goals             {goal}                 -> plan goal + choose best free slot
   GET  /memory/similar    ?trigger_class=&q=     -> best matching protocol
   POST /actions/execute   {event_id, action, params, protocol?} -> allowlisted execution
   POST /actions/preconditions | /actions/verify  -> pipeline check hooks
@@ -24,6 +25,7 @@ from kit.brain import Brain  # noqa: E402
 
 brain = Brain()
 PORT = 7200
+ROOT = Path(__file__).resolve().parent
 
 
 class H(BaseHTTPRequestHandler):
@@ -34,6 +36,15 @@ class H(BaseHTTPRequestHandler):
         b = json.dumps(obj).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(b)))
+        self.end_headers()
+        self.wfile.write(b)
+
+    def _send_html(self, path):
+        b = path.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(b)))
         self.end_headers()
         self.wfile.write(b)
@@ -43,7 +54,13 @@ class H(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
 
     def do_GET(self):
-        if self.path.startswith("/memory/similar"):
+        if self.path in ("/", "/index.html"):
+            f = ROOT / "frontend" / "index.html"
+            if f.exists():
+                self._send_html(f)
+                return
+            self._send(404, {"error": "frontend/index.html not found"})
+        elif self.path.startswith("/memory/similar"):
             from urllib.parse import parse_qs, urlparse
             qs = parse_qs(urlparse(self.path).query)
             m = brain.store.find_protocol(qs.get("trigger_class", [""])[0], qs.get("q", [""])[0])
@@ -62,6 +79,8 @@ class H(BaseHTTPRequestHandler):
         try:
             if self.path == "/events":
                 self._send(200, {"status": brain.ingest(b)})
+            elif self.path == "/goals":
+                self._send(200, brain.plan_goal(b.get("goal", "")))
             elif self.path == "/actions/execute":
                 actor = "brain" if b.get("protocol") else "human"
                 r = brain.inbox.execute(b["event_id"], b["action"], b.get("params", {}), actor)
