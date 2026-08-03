@@ -1,0 +1,10 @@
+{
+  "protocol": {
+    "name": "No approval gate", "trigger_class": "incoming_invoice",
+    "signature_example": "invoice", "risk": "low",
+    "preconditions": [{"field": "event.trigger_class", "operator": "equals", "value": "incoming_invoice"}],
+    "steps": [{"action": "archive", "params": {}}],
+    "postcondition": {"checks": [{"kind": "receipt_exists", "action": "archive"}]}
+  },
+  "expected": "REJECT"
+}

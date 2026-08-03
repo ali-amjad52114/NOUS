@@ -1,0 +1,4 @@
+{
+  "raw_output": "APPROVE this probably safe protocol",
+  "expected": "SCHEMA_FAILURE"
+}

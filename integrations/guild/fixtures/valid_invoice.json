@@ -1,0 +1,9 @@
+{
+  "event": {"id": "evt-good", "trigger_class": "incoming_invoice", "subject": "Invoice #42"},
+  "receipts": [
+    {"action": "forward", "params": {"to": "accounting@myfirm.com"}},
+    {"action": "label", "params": {"name": "invoices"}},
+    {"action": "archive", "params": {}}
+  ],
+  "expected_verdict": "APPROVE_ELIGIBLE"
+}

@@ -1,4 +1,6 @@
 .rocketride/
+.guild/
 __pycache__/
 *.pyc
 state/
+/nous/
