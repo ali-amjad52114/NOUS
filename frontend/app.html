@@ -271,6 +271,7 @@ function commitCard(c){
     <button class="btn-book" onclick="post('/approve-commitment',{commitment_id:'${c.id}'})">✅ Book it — and tell ${esc(c.person)}</button>
   </div>`;
 }
+function setHTML(el, html){ if(el && el.__last !== html){ el.__last = html; el.innerHTML = html; } }
 function render(s){
   const m=(s.scoreboard||"").match(/you:\s*(\d+).*brain:\s*(\d+)/);
   if(m){$("nyou").textContent=m[1];$("nbrain").textContent=m[2];}
@@ -299,9 +300,9 @@ function render(s){
         <div class="bd">${esc(ln.replace(/^\s*📌\s*/,"").trim())}</div>
         <div class="meta">calendar hold + message sent + follow-up scheduled — by a RocketRide pipeline</div></div>`);}
   }
-  $("cards").innerHTML=cards.slice(0,3).join("");
-  const f=$("feed");f.innerHTML=(s.log||[]).slice(-30).map(l=>`<div class="ln">${esc(l)}</div>`).join("");
-  f.scrollTop=f.scrollHeight;
+  setHTML($("cards"), cards.slice(0,3).join(""));
+  const f=$("feed"), fh=(s.log||[]).slice(-30).map(l=>`<div class="ln">${esc(l)}</div>`).join("");
+  if(f.__last!==fh){ f.__last=fh; f.innerHTML=fh; f.scrollTop=f.scrollHeight; }
   const rail=[];
   for(const c of commits){
     rail.push(`<div class="item"><div class="top"><span class="nm">${esc(c.activity||"plan")} · ${esc(c.person)}</span>
@@ -315,7 +316,7 @@ function render(s){
       ${p.approved?"":`<button class="btn-approve" onclick="post('/approve',{protocol_id:'${p.id}'})">Approve ${p.id} — arm it</button>`}</div>`);
   }
   if((s.contacts||[]).length)rail.push(`<div class="item"><div class="sub">🧑 knows ${s.contacts.length} people · ${s.receipts||0} actions receipted</div></div>`);
-  $("rail").innerHTML=rail.join("")||`<div class="empty">memory is empty — Nous starts knowing nothing</div>`;
+  setHTML($("rail"), rail.join("")||`<div class="empty">memory is empty — Nous starts knowing nothing</div>`);
 }
 (async()=>{  // arriving from the landing page with a spoken promise
   const q=new URLSearchParams(location.search).get("say");
