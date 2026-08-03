@@ -1056,7 +1056,7 @@
 </head>
 <body>
   <header class="app-header">
-    <div class="brand" aria-label="Nous">
+    <a class="brand" aria-label="Nous" href="/" style="text-decoration:none;color:inherit;cursor:pointer">
       <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true">
         <defs>
           <linearGradient id="nous-mark-gradient" x1="4" y1="5" x2="31" y2="31" gradientUnits="userSpaceOnUse">
@@ -1071,7 +1071,12 @@
         </g>
       </svg>
       <span>Nous</span>
-    </div>
+    </a>
+    <nav style="display:flex;gap:18px;margin-left:26px;font-weight:600;font-size:14px">
+      <a href="/" style="color:#42605a;text-decoration:none">← Home</a>
+      <a href="/app" style="color:#42605a;text-decoration:none">Your brain</a>
+      <a href="http://localhost:3000" target="_blank" style="color:#42605a;text-decoration:none">Memory graph</a>
+    </nav>
     <div class="connection" id="connection" data-state="connecting" role="status" aria-live="polite">
       <span class="connection-dot" aria-hidden="true"></span>
       <span id="connection-label">Connecting</span>
