@@ -1,141 +1,175 @@
-# 🧠 Nous
+# Nous
 
-**A personal brain that keeps your promises.**
+**A personal brain that keeps your promises — and every skill it learns ships as a RocketRide pipeline.**
 
-You tell a friend "let's get dinner next week" and by Thursday it's gone. Nous doesn't forget. It listens to your life stream, catches the promises you make, works out who you meant and when it should happen, proposes a real time against your calendar, and books it after one approval. When something routine shows up instead, an invoice, a recurring chore, it watches you handle it once, distills your behavior into a typed protocol, and from then on executes that skill as a **RocketRide pipeline**.
+You tell a friend "let's get dinner next week" and by Thursday it's gone. Nous doesn't forget. It listens to your life stream, catches the promises you make, works out who you meant and when it should happen, proposes a real time against your calendar, and books it after one approval. When something routine shows up instead — an invoice, a recurring chore — it watches you handle it once, distills your behavior into a typed protocol, and from then on executes that skill as a **RocketRide pipeline**.
 
-The core is pure Python stdlib with zero dependencies, so verifying it takes one minute:
+```text
+Life event → LaserData → FalkorDB memory → Guild judgment → human approval → RocketRide execution → receipts
+```
+
+Quick local check:
+
+```powershell
+& "C:\Users\aliam\AppData\Local\Programs\Python\Python312\python.exe" demo.py
+& "C:\Users\aliam\AppData\Local\Programs\Python\Python312\python.exe" server.py
+# → http://127.0.0.1:7200
+```
 
 ```bash
-python3 demo.py     # the full arc, ends with ALL CHECKS PASSED
-python3 server.py   # the same brain behind a UI on http://127.0.0.1:7200
+python3 demo.py     # full arc, ends ALL CHECKS PASSED
+python3 server.py   # UI on http://127.0.0.1:7200
 ```
 
-## What the demo proves
+---
 
-1. An invoice arrives. The brain has never seen one, so it **watches** the owner handle it: forward, label, archive.
-2. The watched actions are distilled into **Protocol P-001**, reviewed by a safety critic, and compiled into [`pipes/P-001.pipe`](pipes/P-001.pipe). The brain emits a RocketRide pipeline from watching a human work.
-3. A second invoice from a different vendor arrives **before approval**. The brain **refuses to act**. Nothing runs without the owner's sign-off.
-4. The owner approves once. The refused queue drains, and a third vendor is handled autonomously with a receipt citing the protocol it was taught.
-5. Final scoreboard: owner 3 actions, brain 6. The memory survives a restart.
+## Why RocketRide is the product surface
 
-The same brain also handles the promise flow end to end: type "i wanna meet with kevin next week for dinner" on the landing page and it resolves the person, the activity, and the window, proposes a dated slot, and books it on approval.
+Hackathon judges do not award “we called an LLM.” They award **systems that run on their engine**. Nous treats RocketRide as:
 
-## Architecture
+1. **Compilation target** — watched human handling becomes a Protocol, then a `.pipe`.
+2. **Execution muscle** — approved protocols and promise workflows run on the RocketRide canvas/engine, not as silent Python.
+3. **Observability proof** — every judged run should leave a RocketRide task trace (`rocketride://…`), not only a `fallback://` rehearsal path.
+4. **Prize narrative** — “build the most with RocketRide”: many real pipelines, real nodes, real Guild/LaserData/Falkor tools on the control plane.
 
-```
-                     your life stream
-                    (LaserData / Iggy)
-                            |
-                            v
-                the brain  (server.py + kit/)
-        parse promises . watch . refuse . learn . book
-             |                              |
-             v                              v
-     memory graph                distiller + safety critic
-      (FalkorDB)                        (Guild.ai)
-                                            |
-                                            v
-                                  human approval gate
-                                            |
-                                            v
-                            kit/pipegen.py compiles the skill
-                                            |
-                                            v
-                          RocketRide engine runs the pipeline
-                                            |
-                                            v
-                      POST /actions/* callbacks into the brain
-                        (allowlisted, verified, receipted)
+**CEO line:** *Your engine is our brain’s muscle — every skill it learns compiles into a RocketRide pipeline.*
+
+### Canonical node pattern (v1)
+
+Most prize pipes follow the same RocketRide shape:
+
+```text
+webhook
+  → (optional) guardrails
+  → agent_rocketride
+       ├─ llm_openai          (control)
+       ├─ memory_internal     (control)
+       ├─ tool_guild          (control)  — specialist Guild agents
+       ├─ tool_laserdata_memory (control)
+       └─ graph_falkordb      (control)  — personal_brain
+  → response_answers
 ```
 
-The inversion that matters: once a skill is approved, **the app does not execute it. The RocketRide engine does.** The brain only exposes guarded callback endpoints and keeps the receipts.
+Invoice execution also uses the custom **`nous_protocol`** filter (preconditions → ordered `/actions/execute` → verify) calling back into Nous at `${NOUS_CALLBACK_BASE}` (default `http://127.0.0.1:7200`).
 
-## RocketRide, the execution engine
+### RocketRide pipe catalog
 
-RocketRide is the deepest integration in this repo. It is not a demo step, it is the runtime for every skill the brain learns.
+| Lane | Pipes | Job |
+| ---- | ----- | --- |
+| **Ingest** | `P-INGEST-GMAIL`, `P-INGEST-SLACK`, `P-INGEST-CALENDAR` | Guild readers → normalize → LaserData `nous:life-events` |
+| **Commitments** | `P-PROCESS-COMMITMENT`, `P-PROMISE-KEPT` | Propose / keep a promise with critic + approval gate |
+| **Slots & action** | `P-FIND-SLOT`, `P-BOOK-HOLD`, `P-SEND-MESSAGE`, `P-FOLLOWUP-NUDGE`, `P-EXECUTE-ACTION` | Calendar/message motion via Guild writers |
+| **Judgment (Session A)** | `P-DISTILL-PROTOCOL`, `P-CRITIC-REVIEW`, `P-APPROVE-ARM`, `P-VERIFY-RECEIPTS` | Distill → critic → arm → verify |
+| **Classifiers** | `P-NOISE-FILTER`, `P-IMPORTANT-PERSONAL` | Ignore noise; soft personal stubs |
+| **Learned skills** | `P-001`, `P-KEEPER` | Invoice protocol & keep-a-promise protocol executors |
+| **Replay** | `P-REPLAY-DAY` | Day-of-life replay from durable streams |
 
-**Skills compile into pipelines.** [`kit/pipegen.py`](kit/pipegen.py) turns every approved protocol into a portable pipeline definition. Two are committed: [`pipes/P-001.pipe`](pipes/P-001.pipe) (the learned invoice skill) and [`pipes/P-KEEPER.pipe`](pipes/P-KEEPER.pipe) (the promise keeper). Each pipeline chains a trigger, a precondition check, one node per learned step, and a postcondition verify.
+Catalog notes: `pipes/SESSION_A_PIPES.md`, `pipes/SESSION_B_PIPES.md`, `pipes/P-PROMISE-KEPT.md`, `pipes/GUILD_ROCKETRIDE.md`.
 
-**A custom RocketRide node.** [`integrations/rocketride/nodes/nous_protocol/`](integrations/rocketride/nodes/nous_protocol/) is a data-plane node built against the RocketRide node SDK (`rocketlib`). It binds `$input` parameters, calls the brain's `/actions/preconditions` gate, executes each step through `/actions/execute` with stable step IDs, then confirms the postcondition through `/actions/verify`. Failures return structured errors instead of half-finished work.
+### RocketRide deep dive
 
-**Strict SDK lifecycle with real traces.** [`integrations/rocketride_runner.py`](integrations/rocketride_runner.py) drives the full RocketRide client lifecycle: `ping`, `validate`, `use` with `FLOW` trace level, `send`, `terminate`. Every run carries a `rocketride://task/<token>` trace reference, so a judged run maps to a visible task trace on the engine. Strict `local` and `cloud` modes refuse to fall back silently; the deterministic fallback exists only for rehearsal and labels itself.
+**Skills compile into pipelines.** [`kit/pipegen.py`](kit/pipegen.py) turns approved protocols into portable `.pipe` files. Committed examples include [`pipes/P-001.pipe`](pipes/P-001.pipe) and [`pipes/P-KEEPER.pipe`](pipes/P-KEEPER.pipe), plus the full ingest/judgment/action catalog above.
 
-**Idempotent by construction.** Replaying a `(run_id, step_id)` pair returns the original receipt without acting twice, so a retried pipeline never double-executes a side effect.
+**Custom RocketRide node.** [`integrations/rocketride/nodes/nous_protocol/`](integrations/rocketride/nodes/nous_protocol/) binds `$input` parameters, calls `/actions/preconditions`, executes steps through `/actions/execute` with stable step IDs, then `/actions/verify`.
 
-**Try it yourself:**
+**Strict SDK lifecycle with real traces.** [`integrations/rocketride_runner.py`](integrations/rocketride_runner.py) drives `ping` → `validate` → `use` (FLOW trace) → `send` → `terminate`. Strict `local`/`cloud` modes refuse silent fallback; rehearsal fallback labels itself `fallback://`.
+
+**Idempotent by construction.** Replaying `(run_id, step_id)` returns the original receipt without acting twice.
 
 ```bash
 python3 integrations/rocketride_smoke.py --evidence evidence/rocketride-smoke.json
 python3 integrations/rocketride_live_demo.py --evidence evidence/rocketride-mvp.json
 ```
 
-The full runbook and acceptance criteria live in [`integrations/rocketride/README.md`](integrations/rocketride/README.md).
+Runbook: [`integrations/rocketride/README.md`](integrations/rocketride/README.md).
 
-## FalkorDB, the memory
+### RocketRide env
 
-Every person, promise, protocol, and receipt lives in a graph. [`kit/memory.py`](kit/memory.py) ships two interchangeable stores: a zero-dependency local store, and a FalkorDB store that mirrors every write as Cypher.
+| Variable | Role |
+| -------- | ---- |
+| `${ROCKETRIDE_OPENAI_KEY}` | `llm_openai` on agent pipes |
+| `${GUILD_API_KEY_ID}` / `${GUILD_API_KEY_SECRET}` | `tool_guild` |
+| `${GUILD_WORKSPACE_OWNER}` / `${GUILD_WORKSPACE_NAME}` | Guild workspace |
+| `${LASER_CONNECTION_STRING}` | `tool_laserdata_memory` |
+| `${FALKOR_HOST}` / `${FALKOR_USERNAME}` / `${FALKOR_PASSWORD}` | `graph_falkordb` → `personal_brain` |
+| `${NOUS_CALLBACK_BASE}` | `nous_protocol` callbacks |
+| `ROCKETRIDE_MODE` / `ROCKETRIDE_URI` / `ROCKETRIDE_APIKEY` | Python SDK runner |
+
+---
+
+## Sponsors (all load-bearing)
+
+### RocketRide — the muscle (primary)
+
+Runtime, canvas pipelines, traces, cloud deployability. Break it and the brain remembers but never moves.
+
+### LaserData — the senses
+
+Durable life-event and receipt streams. Namespaces: `nous:life-events`, `nous:receipts`. App publish: [`kit/laserdata.py`](kit/laserdata.py). Break it and the brain is deaf.
+
+### FalkorDB — the memory
+
+Life graph `personal_brain` (Event, Contact, Commitment, Protocol, Receipt, Person, Action). [`kit/memory.py`](kit/memory.py) LocalStore or `MEMORY_BACKEND=falkor`.
 
 ```bash
 docker run -p 6379:6379 -p 3000:3000 falkordb/falkordb:latest
 MEMORY_BACKEND=falkor python3 server.py
 ```
 
-Open the FalkorDB browser at `http://localhost:3000` (graph `personal_brain`) and watch memory grow while you use the app. A good starting query:
-
 ```cypher
 MATCH (c:Commitment)-[r]->(x) RETURN c, r, x
 ```
 
-Screenshots of live graphs are in [`evidence/`](evidence/).
+### Guild.ai — the judgment
 
-## Guild.ai, the judgment
+- **nous-distiller** — watched session → typed Protocol  
+- **nous-critic** — `APPROVE_ELIGIBLE` \| `REJECT`  
+- Connector agents — Gmail/Slack/Calendar readers & writers  
 
-Two typed Guild agents stand between watching and acting, both published to a real Guild workspace with IDs recorded in [`evidence/guild-session-3.md`](evidence/guild-session-3.md):
+Guild never arms anything; the human owner does. Sources: [`integrations/guild/`](integrations/guild/).
 
-* **nous-distiller** turns a watched event plus action receipts into a typed protocol: trigger class, steps, preconditions, a verifiable postcondition.
-* **nous-critic** reviews that protocol against policy and returns `APPROVE_ELIGIBLE` or `REJECT` with findings. In our recorded sessions it rejected a non-allowlisted `delete` action, a hardcoded vendor identity, and a missing postcondition.
+---
 
-Guild never arms anything. A `REJECT` can never be approved, an `APPROVE_ELIGIBLE` still requires the human owner to click Approve, and if either agent times out or returns an invalid schema, Nous fails closed and persists nothing. Sources, fixtures, and the runbook are in [`integrations/guild/`](integrations/guild/), covered by 11 integration tests.
+## What the demo proves
 
-## LaserData, the senses
+1. Invoice arrives → brain **watches** forward/label/archive.  
+2. Distilled **P-001**, critic-reviewed, compiled to a RocketRide `.pipe`.  
+3. Second invoice **before approval** → **refuses**.  
+4. Approve once → autonomous handling + receipts.  
+5. Promise flow: typed promise → slot → approve → book/send (RocketRide path).  
+6. Memory survives restart / Falkor browser still shows the graph.
 
-Every event the brain ingests is published to a Laser Stack stream in real time by [`kit/laserdata.py`](kit/laserdata.py), a failure-safe publisher that redacts credentials and never blocks the brain if the stream is down. [`integrations/replay_laserdata.py`](integrations/replay_laserdata.py) replays a captured stream back through the brain, and deployment screenshots are in [`evidence/`](evidence/).
+---
 
-## The safety model
+## Safety model
 
-Nous is built refuse-first. Untrained event classes are watched, never guessed at. Actions are allowlisted and typed. The critic reviews every distilled protocol before it can even be offered for approval. The human owner is the only party who can arm a skill, and every autonomous action leaves a receipt naming the protocol and the run that produced it.
+Refuse-first. Allowlisted actions only. Critic before human arm. RocketRide callbacks via `/actions/preconditions|execute|verify` with stable `run_id` / `step_id` dedupe. Secrets stay in gitignored `.env`.
+
+---
 
 ## Repository map
 
 ```
-server.py                     the brain's HTTP surface (stdlib only)
-demo.py                       headless full-arc check, ends ALL CHECKS PASSED
-kit/
-  brain.py                    ingest, watch, refuse, learn, book
-  parse.py                    deterministic promise parser (who, what, when)
-  memory.py                   graph memory: local store + FalkorDB mirror
-  pipegen.py                  compiles approved protocols into .pipe files
-  distill.py                  distiller + critic roles
-  laserdata.py                failure-safe Laser Stack publisher
-  feed.py                     the demo life stream
-frontend/                     landing page, the brain UI, power console
-pipes/                        compiled RocketRide pipelines (P-001, P-KEEPER)
-integrations/
-  rocketride/                 custom node, smoke pipe, runbook
-  rocketride_runner.py        strict SDK lifecycle runner
-  guild/                      published agent sources, fixtures, runbook
-tests/                        RocketRide, Guild, and pipegen test suites
-evidence/                     screenshots and session IDs from live services
+server.py                     brain HTTP surface
+demo.py                       headless ALL CHECKS PASSED
+kit/                          brain, parse, memory, pipegen, distill, laserdata, feed
+frontend/                     landing, app, console, graph
+pipes/                        RocketRide pipelines + session catalogs
+integrations/rocketride/      custom node, smoke, runbook
+integrations/guild/           Distiller, Critic, connector agents
+tests/                        RocketRide, Guild, pipegen suites
+evidence/                     live session screenshots / IDs
 ```
 
 ## Tests
 
 ```bash
-python3 demo.py                          # ALL CHECKS PASSED
-python3 -m unittest discover -s tests    # RocketRide callbacks, Guild contracts, pipegen
+python3 demo.py
+python3 -m unittest discover -s tests
 ```
 
-## Team
+## Team / disclosure
 
-Built in one day at Memory Meets Motion (Devnovate, Frontier Tower, San Francisco). AI coding assistants were used throughout the build; every sponsor integration was exercised against the real running service, and the evidence folder holds the session IDs and screenshots to prove it.
+Built at Memory Meets Motion (Devnovate, Frontier Tower, San Francisco). AI coding assistants were used; sponsor integrations were exercised against live services where evidence is recorded.
+
+> Nous is a personal brain that keeps your promises — **LaserData senses, FalkorDB remembers, Guild judges, RocketRide moves.**

@@ -1,0 +1,152 @@
+{
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "webhook"
+      },
+      "ui": { "position": { "x": 20, "y": 200 } }
+    },
+    {
+      "id": "guardrails_1",
+      "provider": "guardrails",
+      "config": {
+        "profile": "custom",
+        "custom": {
+          "policy_mode": "block",
+          "enable_prompt_injection": true,
+          "enable_content_safety": true,
+          "enable_pii_detection": false,
+          "enable_hallucination_check": false,
+          "max_input_length": 4000,
+          "max_tokens_estimate": 2000,
+          "expected_format": "json",
+          "blocked_topics": [],
+          "allowed_topics": ["commitment_id", "approved", "correlation_id"]
+        }
+      },
+      "input": [{ "lane": "questions", "from": "webhook_1" }],
+      "ui": { "position": { "x": 200, "y": 200 } }
+    },
+    {
+      "id": "agent_rocketride_1",
+      "provider": "agent_rocketride",
+      "config": {
+        "agent_description": "Nous book-hold: FalkorDB trust store → Guild Calendar create_event → LaserData + FalkorDB receipt. Complements P-EXECUTE-ACTION.",
+        "instructions": [
+          "Browser/webhook input MUST be only {commitment_id, approved:true} plus optional correlation_id. Never trust title/date/description from the browser.",
+          "1) If approved is not exactly true, create nothing and return {\"status\":\"rejected\",\"reason\":\"not_approved\",\"commitment_id\":...,\"correlation_id\":...}.",
+          "2) Load commitment + proposed_action + proposed_slot + guild_review from FalkorDB personal_brain by commitment_id.",
+          "3) Guard checks before any write: commitment exists; proposal/proposed_slot exists; Guild Critic accepted (if present); operation is google_calendar.create_event; person and start exist; no successful book Receipt already for this Action.",
+          "4) If a successful book receipt already exists, return that existing receipt (duplicate approval) without creating another calendar event. status=completed with existing external_id.",
+          "5) Call tool_guild (nous-calendar-writer) create_event with ONLY trusted FalkorDB proposal fields plus correlation_id and commitment_id.",
+          "6) On Calendar failure: do not mark commitment booked; publish failure to LaserData namespace nous:receipts; write failure Receipt in FalkorDB if possible; return {\"status\":\"failed\",...}. Never fabricate external_id.",
+          "7) On success: publish execution result to LaserData nous:receipts; write (:Action)-[:PRODUCED]->(:Receipt) in FalkorDB with real Google event id, rocketride run id if available, executed_at, provider_status; mark commitment status=booked only after provider success.",
+          "8) Return JSON only:",
+          "{\"status\":\"completed\",\"external_id\":\"real-google-event-id\",\"correlation_id\":\"...\",\"commitment_id\":\"...\"}"
+        ],
+        "max_waves": 12,
+        "parameters": {}
+      },
+      "input": [{ "lane": "questions", "from": "guardrails_1" }],
+      "ui": { "position": { "x": 420, "y": 200 } }
+    },
+    {
+      "id": "llm_openai_1",
+      "provider": "llm_openai",
+      "config": {
+        "profile": "openai-4o-mini",
+        "openai-4o-mini": { "apikey": "${ROCKETRIDE_OPENAI_KEY}" },
+        "parameters": {}
+      },
+      "control": [
+        { "classType": "llm", "from": "agent_rocketride_1" },
+        { "classType": "llm", "from": "graph_falkordb_1" }
+      ],
+      "ui": { "position": { "x": 420, "y": 20 } }
+    },
+    {
+      "id": "memory_internal_1",
+      "provider": "memory_internal",
+      "config": { "type": "memory_internal" },
+      "control": [{ "classType": "memory", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 420, "y": 380 } }
+    },
+    {
+      "id": "graph_falkordb_1",
+      "provider": "graph_falkordb",
+      "config": {
+        "type": "graph_falkordb",
+        "host": "${FALKOR_HOST}",
+        "port": 6379,
+        "username": "${FALKOR_USERNAME}",
+        "password": "${FALKOR_PASSWORD}",
+        "tls": false,
+        "graph": "personal_brain",
+        "db_description": "Nous personal brain trust store for commitments, proposed actions, and book-hold receipts.",
+        "allow_writes": true,
+        "allow_execute": true,
+        "max_attempts": 5,
+        "max_rows": 250,
+        "max_execute_rows": 25000,
+        "query_timeout_ms": 30000
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 660, "y": 40 } }
+    },
+    {
+      "id": "tool_guild_1",
+      "provider": "tool_guild",
+      "config": {
+        "type": "tool_guild",
+        "baseUrl": "https://app.guild.ai",
+        "apiKeyId": "${GUILD_API_KEY_ID}",
+        "apiKeySecret": "${GUILD_API_KEY_SECRET}",
+        "owner": "${GUILD_WORKSPACE_OWNER}",
+        "workspace": "${GUILD_WORKSPACE_NAME}",
+        "agent": "nous-calendar-writer",
+        "resultMode": "wait",
+        "timeout": 300,
+        "maxSessions": 3,
+        "verifyTls": true
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 660, "y": 200 } }
+    },
+    {
+      "id": "tool_laserdata_memory_1",
+      "provider": "tool_laserdata_memory",
+      "config": {
+        "type": "tool_laserdata_memory",
+        "profile": "cloud",
+        "cloud": {
+          "connection_string": "${LASER_CONNECTION_STRING}",
+          "namespace": "nous:receipts",
+          "show_advanced": true,
+          "stream": "nous",
+          "allow_namespace_override": true,
+          "folded": true,
+          "recall_limit": 20,
+          "op_timeout": 30
+        }
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 660, "y": 360 } }
+    },
+    {
+      "id": "response_answers_1",
+      "provider": "response_answers",
+      "config": { "laneName": "result" },
+      "input": [{ "lane": "answers", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 900, "y": 200 } }
+    }
+  ],
+  "description": "Approved book-hold → Guild Calendar create_event → LaserData + FalkorDB receipt (status booked)",
+  "project_id": "cf4988e1-b0fc-4d58-920a-6accce244c41",
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "version": 1
+}

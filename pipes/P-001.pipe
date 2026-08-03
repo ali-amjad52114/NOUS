@@ -9,80 +9,45 @@
         "parameters": {},
         "type": "webhook"
       },
-      "ui": {
-        "position": {
-          "x": 20,
-          "y": 160
-        }
-      }
+      "ui": { "position": { "x": 20, "y": 160 } }
     },
     {
       "id": "nous_protocol_1",
       "provider": "nous_protocol",
       "config": {
         "type": "nous_protocol",
-        "callback_base": "http://127.0.0.1:7200",
+        "callback_base": "${NOUS_CALLBACK_BASE}",
         "protocol_id": "P-001",
         "trigger_class": "incoming_invoice",
         "steps": [
           {
             "action": "forward",
-            "params": {
-              "to": "accounting@myfirm.com"
-            }
+            "params": { "to": "$to" }
           },
           {
             "action": "label",
-            "params": {
-              "name": "invoices"
-            }
+            "params": { "name": "invoices" }
           },
           {
             "action": "archive",
             "params": {}
           }
         ],
-        "postcondition": "{\"checks\":[{\"action\":\"forward\",\"kind\":\"receipt_exists\"},{\"action\":\"label\",\"kind\":\"receipt_exists\"},{\"action\":\"archive\",\"kind\":\"receipt_exists\"}]}"
+        "postcondition": "{\"checks\":[{\"kind\":\"receipt_exists\",\"action\":\"forward\"},{\"kind\":\"receipt_exists\",\"action\":\"label\"},{\"kind\":\"receipt_exists\",\"action\":\"archive\"}]}"
       },
-      "input": [
-        {
-          "lane": "text",
-          "from": "webhook_1"
-        }
-      ],
-      "ui": {
-        "position": {
-          "x": 240,
-          "y": 160
-        }
-      }
+      "input": [{ "lane": "text", "from": "webhook_1" }],
+      "ui": { "position": { "x": 240, "y": 160 } }
     },
     {
       "id": "response_text_1",
       "provider": "response_text",
-      "config": {
-        "laneName": "result"
-      },
-      "input": [
-        {
-          "lane": "text",
-          "from": "nous_protocol_1"
-        }
-      ],
-      "ui": {
-        "position": {
-          "x": 460,
-          "y": 160
-        }
-      }
+      "config": { "laneName": "result" },
+      "input": [{ "lane": "text", "from": "nous_protocol_1" }],
+      "ui": { "position": { "x": 460, "y": 160 } }
     }
   ],
+  "description": "Nous protocol P-001 incoming_invoice: forward → label(invoices) → archive (parameterized to)",
   "project_id": "62d95053-1710-5e7a-910e-63626d8cbaf8",
-  "description": "Nous protocol P-001 (incoming_invoice)",
-  "viewport": {
-    "x": 0,
-    "y": 0,
-    "zoom": 1
-  },
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
   "version": 1
 }

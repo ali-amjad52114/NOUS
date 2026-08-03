@@ -1,0 +1,86 @@
+{
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "webhook"
+      },
+      "ui": { "position": { "x": 20, "y": 180 } }
+    },
+    {
+      "id": "agent_rocketride_1",
+      "provider": "agent_rocketride",
+      "config": {
+        "agent_description": "Nous replay-day: LaserData nous:life-events recall from offset → normalize/republish. No Guild writes. No FalkorDB deletes.",
+        "instructions": [
+          "Replay a slice of the life stream. Never call Guild writers. Never create Gmail/Slack/Calendar side effects. Never delete FalkorDB nodes.",
+          "Expected input: {correlation_id, from_offset:0, limit?}. Default limit=20 if omitted.",
+          "1) Preserve correlation_id. Coerce from_offset to integer >= 0.",
+          "2) Recall from LaserData namespace nous:life-events starting at from_offset with the given limit.",
+          "3) Normalize each recalled item to a stable event shape {event_id, correlation_id, source, ...} without inventing content.",
+          "4) Remember/republish the normalized batch back to LaserData namespace nous:life-events tagged as replay (e.g. replay:true, replay_of_offset, replay_correlation_id). Do not mutate external providers.",
+          "5) FalkorDB: read-only optional lookups only. No destructive deletes. No status overwrites.",
+          "6) Return JSON only:",
+          "{\"status\":\"replayed\",\"count\":N,\"event_ids\":[\"...\"],\"correlation_id\":\"...\"}"
+        ],
+        "max_waves": 8,
+        "parameters": {}
+      },
+      "input": [{ "lane": "questions", "from": "webhook_1" }],
+      "ui": { "position": { "x": 260, "y": 180 } }
+    },
+    {
+      "id": "llm_openai_1",
+      "provider": "llm_openai",
+      "config": {
+        "profile": "openai-4o-mini",
+        "openai-4o-mini": { "apikey": "${ROCKETRIDE_OPENAI_KEY}" },
+        "parameters": {}
+      },
+      "control": [{ "classType": "llm", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 260, "y": 20 } }
+    },
+    {
+      "id": "memory_internal_1",
+      "provider": "memory_internal",
+      "config": { "type": "memory_internal" },
+      "control": [{ "classType": "memory", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 260, "y": 340 } }
+    },
+    {
+      "id": "tool_laserdata_memory_1",
+      "provider": "tool_laserdata_memory",
+      "config": {
+        "type": "tool_laserdata_memory",
+        "profile": "cloud",
+        "cloud": {
+          "connection_string": "${LASER_CONNECTION_STRING}",
+          "namespace": "nous:life-events",
+          "show_advanced": true,
+          "stream": "nous",
+          "allow_namespace_override": false,
+          "folded": true,
+          "recall_limit": 50,
+          "op_timeout": 30
+        }
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 480, "y": 180 } }
+    },
+    {
+      "id": "response_answers_1",
+      "provider": "response_answers",
+      "config": { "laneName": "result" },
+      "input": [{ "lane": "answers", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 700, "y": 180 } }
+    }
+  ],
+  "description": "LaserData life-events recall from offset → normalize/republish (no Guild writes, no Falkor deletes)",
+  "project_id": "852eaba2-8919-4219-b68c-a46960f387c0",
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "version": 1
+}

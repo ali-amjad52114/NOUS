@@ -1,0 +1,103 @@
+{
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "webhook"
+      },
+      "ui": { "position": { "x": 20, "y": 180 } }
+    },
+    {
+      "id": "agent_rocketride_1",
+      "provider": "agent_rocketride",
+      "config": {
+        "agent_description": "Nous Calendar availability ingest via Guild, publish to LaserData.",
+        "instructions": [
+          "You orchestrate Calendar availability checks for Nous. Read-only. Do not create/update/delete events. Do not detect commitments.",
+          "Expected input: {correlation_id, operation:check_availability, window_start, window_end}.",
+          "1) Validate window_start/window_end ISO-8601 and preserve correlation_id.",
+          "2) Call tool_guild (nous-calendar-reader) for real free/busy/events in that window.",
+          "3) Normalize to {event_id, correlation_id, source:calendar, window_start, window_end, available, conflicts, checked_at}.",
+          "4) Remember the normalized availability JSON in LaserData namespace nous:life-events.",
+          "5) Return JSON with status published plus the normalized object and LaserData remember confirmation."
+        ],
+        "max_waves": 8,
+        "parameters": {}
+      },
+      "input": [{ "lane": "questions", "from": "webhook_1" }],
+      "ui": { "position": { "x": 260, "y": 180 } }
+    },
+    {
+      "id": "llm_openai_1",
+      "provider": "llm_openai",
+      "config": {
+        "profile": "openai-4o-mini",
+        "openai-4o-mini": { "apikey": "${ROCKETRIDE_OPENAI_KEY}" },
+        "parameters": {}
+      },
+      "control": [{ "classType": "llm", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 260, "y": 20 } }
+    },
+    {
+      "id": "memory_internal_1",
+      "provider": "memory_internal",
+      "config": { "type": "memory_internal" },
+      "control": [{ "classType": "memory", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 260, "y": 340 } }
+    },
+    {
+      "id": "tool_guild_1",
+      "provider": "tool_guild",
+      "config": {
+        "type": "tool_guild",
+        "baseUrl": "https://app.guild.ai",
+        "apiKeyId": "${GUILD_API_KEY_ID}",
+        "apiKeySecret": "${GUILD_API_KEY_SECRET}",
+        "owner": "${GUILD_WORKSPACE_OWNER}",
+        "workspace": "${GUILD_WORKSPACE_NAME}",
+        "agent": "nous-calendar-reader",
+        "resultMode": "wait",
+        "timeout": 300,
+        "maxSessions": 5,
+        "verifyTls": true
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 480, "y": 60 } }
+    },
+    {
+      "id": "tool_laserdata_memory_1",
+      "provider": "tool_laserdata_memory",
+      "config": {
+        "type": "tool_laserdata_memory",
+        "profile": "cloud",
+        "cloud": {
+          "connection_string": "${LASER_CONNECTION_STRING}",
+          "namespace": "nous:life-events",
+          "show_advanced": true,
+          "stream": "nous",
+          "allow_namespace_override": false,
+          "folded": true,
+          "recall_limit": 20,
+          "op_timeout": 30
+        }
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 480, "y": 260 } }
+    },
+    {
+      "id": "response_answers_1",
+      "provider": "response_answers",
+      "config": { "laneName": "result" },
+      "input": [{ "lane": "answers", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 700, "y": 180 } }
+    }
+  ],
+  "description": "Guild Calendar read → normalize availability → LaserData (RocketRide orchestrates)",
+  "project_id": "5256c3a4-e768-4f13-ad47-7fa623851e02",
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "version": 1
+}

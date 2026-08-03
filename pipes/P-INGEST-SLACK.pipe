@@ -1,0 +1,103 @@
+{
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "webhook"
+      },
+      "ui": { "position": { "x": 20, "y": 180 } }
+    },
+    {
+      "id": "agent_rocketride_1",
+      "provider": "agent_rocketride",
+      "config": {
+        "agent_description": "Nous Slack ingest: Guild reads Slack, RocketRide publishes to LaserData.",
+        "instructions": [
+          "You orchestrate Slack ingest for Nous. Do not detect commitments. Do not call FalkorDB. Do not post to Slack.",
+          "1) Parse webhook for correlation_id, channel_id, message_ts, optional workspace_id/thread_ts.",
+          "2) Call tool_guild (nous-slack-reader) to retrieve that ONE message and normalized event.",
+          "3) Ensure fields: event_id, correlation_id, source=slack, source_id, workspace_id, channel_id, sender, text, thread_id, timestamp. event_id = slack:<channel_id>:<message_ts>.",
+          "4) Deduplicate via LaserData recall on event_id in namespace nous:life-events. If found, return duplicate_skipped.",
+          "5) Remember normalized event in LaserData.",
+          "6) Return JSON only with status published|duplicate_skipped plus event and correlation_id."
+        ],
+        "max_waves": 8,
+        "parameters": {}
+      },
+      "input": [{ "lane": "questions", "from": "webhook_1" }],
+      "ui": { "position": { "x": 260, "y": 180 } }
+    },
+    {
+      "id": "llm_openai_1",
+      "provider": "llm_openai",
+      "config": {
+        "profile": "openai-4o-mini",
+        "openai-4o-mini": { "apikey": "${ROCKETRIDE_OPENAI_KEY}" },
+        "parameters": {}
+      },
+      "control": [{ "classType": "llm", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 260, "y": 20 } }
+    },
+    {
+      "id": "memory_internal_1",
+      "provider": "memory_internal",
+      "config": { "type": "memory_internal" },
+      "control": [{ "classType": "memory", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 260, "y": 340 } }
+    },
+    {
+      "id": "tool_guild_1",
+      "provider": "tool_guild",
+      "config": {
+        "type": "tool_guild",
+        "baseUrl": "https://app.guild.ai",
+        "apiKeyId": "${GUILD_API_KEY_ID}",
+        "apiKeySecret": "${GUILD_API_KEY_SECRET}",
+        "owner": "${GUILD_WORKSPACE_OWNER}",
+        "workspace": "${GUILD_WORKSPACE_NAME}",
+        "agent": "nous-slack-reader",
+        "resultMode": "wait",
+        "timeout": 300,
+        "maxSessions": 5,
+        "verifyTls": true
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 480, "y": 60 } }
+    },
+    {
+      "id": "tool_laserdata_memory_1",
+      "provider": "tool_laserdata_memory",
+      "config": {
+        "type": "tool_laserdata_memory",
+        "profile": "cloud",
+        "cloud": {
+          "connection_string": "${LASER_CONNECTION_STRING}",
+          "namespace": "nous:life-events",
+          "show_advanced": true,
+          "stream": "nous",
+          "allow_namespace_override": false,
+          "folded": true,
+          "recall_limit": 20,
+          "op_timeout": 30
+        }
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 480, "y": 260 } }
+    },
+    {
+      "id": "response_answers_1",
+      "provider": "response_answers",
+      "config": { "laneName": "result" },
+      "input": [{ "lane": "answers", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 700, "y": 180 } }
+    }
+  ],
+  "description": "Guild Slack OAuth → normalize → LaserData publish (RocketRide orchestrates)",
+  "project_id": "158d361a-ff8b-401d-b015-641631e49cdb",
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "version": 1
+}

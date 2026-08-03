@@ -1,0 +1,146 @@
+{
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "webhook"
+      },
+      "ui": { "position": { "x": 20, "y": 200 } }
+    },
+    {
+      "id": "guardrails_1",
+      "provider": "guardrails",
+      "config": {
+        "profile": "strict",
+        "strict": {
+          "policy_mode": "block",
+          "max_tokens_estimate": 8000,
+          "expected_format": "json"
+        }
+      },
+      "input": [{ "lane": "questions", "from": "webhook_1" }],
+      "ui": { "position": { "x": 200, "y": 200 } }
+    },
+    {
+      "id": "agent_rocketride_1",
+      "provider": "agent_rocketride",
+      "config": {
+        "agent_description": "Nous commitment processor: LaserData + FalkorDB + Guild Critic. No external writes.",
+        "instructions": [
+          "You process ONE normalized life event into an approval-ready commitment proposal. Never create calendar events. Never send email/Slack.",
+          "Input may include event_id and/or correlation_id, or the full normalized event.",
+          "1) Load/hold the event in memory_internal. If only event_id is given, recall it from LaserData namespace nous:life-events.",
+          "2) Query FalkorDB (personal_brain) for: related Contact, open Commitments for that person, duplicate source Event by source_event_id/event_id, existing proposal/receipt.",
+          "3) If duplicate source event already has a Commitment/proposal, return {\"status\":\"rejected\",\"reason\":\"duplicate_source_event\",\"correlation_id\":...}.",
+          "4) Interpret the message (example: I'm coming to see you this Saturday.) and extract a structured proposal:",
+          "{\"commitment_id\":\"C-...\",\"correlation_id\":\"...\",\"source_event_id\":\"...\",\"source\":\"gmail|slack|calendar\",\"source_sentence\":\"...\",\"person\":\"...\",\"commitment\":\"...\",\"scheduled_date\":\"ISO-8601\",\"proposed_action\":{\"connector\":\"google_calendar\",\"operation\":\"create_event\",\"parameters\":{\"title\":\"...\",\"start\":\"...\",\"duration_minutes\":60,\"description\":\"...\"}},\"requires_approval\":true}",
+          "5) Reject locally if person missing, date missing, or proposed_action unsupported (only google_calendar.create_event allowed).",
+          "6) Send the structured proposal to tool_guild (nous-critic) for adversarial review. If verdict is REJECT (or accepted=false), return status rejected with guild_review notes. Do not store an approval-ready commitment.",
+          "7) On Guild accept: write FalkorDB graph with allow_writes: (:Event)-[:CREATED]->(:Commitment), (:Commitment)-[:PROMISED_TO]->(:Contact), (:Commitment)-[:PROPOSED_ACTION]->(:Action). Persist proposal JSON on Commitment/Action.",
+          "8) Return JSON only: {\"status\":\"awaiting_approval\"|\"rejected\", \"proposal\":{...}, \"guild_review\":{...}, \"correlation_id\":\"...\"}."
+        ],
+        "max_waves": 12,
+        "parameters": {}
+      },
+      "input": [{ "lane": "questions", "from": "guardrails_1" }],
+      "ui": { "position": { "x": 420, "y": 200 } }
+    },
+    {
+      "id": "llm_openai_1",
+      "provider": "llm_openai",
+      "config": {
+        "profile": "openai-4o-mini",
+        "openai-4o-mini": { "apikey": "${ROCKETRIDE_OPENAI_KEY}" },
+        "parameters": {}
+      },
+      "control": [
+        { "classType": "llm", "from": "agent_rocketride_1" },
+        { "classType": "llm", "from": "graph_falkordb_1" }
+      ],
+      "ui": { "position": { "x": 420, "y": 20 } }
+    },
+    {
+      "id": "memory_internal_1",
+      "provider": "memory_internal",
+      "config": { "type": "memory_internal" },
+      "control": [{ "classType": "memory", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 420, "y": 380 } }
+    },
+    {
+      "id": "tool_laserdata_memory_1",
+      "provider": "tool_laserdata_memory",
+      "config": {
+        "type": "tool_laserdata_memory",
+        "profile": "cloud",
+        "cloud": {
+          "connection_string": "${LASER_CONNECTION_STRING}",
+          "namespace": "nous:life-events",
+          "show_advanced": true,
+          "stream": "nous",
+          "allow_namespace_override": true,
+          "folded": true,
+          "recall_limit": 20,
+          "op_timeout": 30
+        }
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 660, "y": 40 } }
+    },
+    {
+      "id": "graph_falkordb_1",
+      "provider": "graph_falkordb",
+      "config": {
+        "type": "graph_falkordb",
+        "host": "${FALKOR_HOST}",
+        "port": 6379,
+        "username": "${FALKOR_USERNAME}",
+        "password": "${FALKOR_PASSWORD}",
+        "tls": false,
+        "graph": "personal_brain",
+        "db_description": "Nous personal brain graph: Event, Contact, Commitment, Action, Receipt, Person, Protocol. Edges: CREATED, PROMISED_TO, PROPOSED_ACTION, PRODUCED, DETECTED_IN, OF_CLASS.",
+        "allow_writes": true,
+        "allow_execute": true,
+        "max_attempts": 5,
+        "max_rows": 250,
+        "max_execute_rows": 25000,
+        "query_timeout_ms": 30000
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 660, "y": 200 } }
+    },
+    {
+      "id": "tool_guild_1",
+      "provider": "tool_guild",
+      "config": {
+        "type": "tool_guild",
+        "baseUrl": "https://app.guild.ai",
+        "apiKeyId": "${GUILD_API_KEY_ID}",
+        "apiKeySecret": "${GUILD_API_KEY_SECRET}",
+        "owner": "${GUILD_WORKSPACE_OWNER}",
+        "workspace": "${GUILD_WORKSPACE_NAME}",
+        "agent": "nous-critic",
+        "resultMode": "wait",
+        "timeout": 300,
+        "maxSessions": 5,
+        "verifyTls": true
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 660, "y": 360 } }
+    },
+    {
+      "id": "response_answers_1",
+      "provider": "response_answers",
+      "config": { "laneName": "result" },
+      "input": [{ "lane": "answers", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 900, "y": 200 } }
+    }
+  ],
+  "description": "LaserData event → FalkorDB context → commitment extract → Guild Critic → store proposal",
+  "project_id": "b3fac2b2-685c-4270-90ac-1e4e62c34100",
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "version": 1
+}

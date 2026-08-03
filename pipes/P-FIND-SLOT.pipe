@@ -1,0 +1,216 @@
+{
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "webhook"
+      },
+      "ui": {
+        "position": {
+          "x": 20,
+          "y": 200
+        }
+      }
+    },
+    {
+      "id": "agent_rocketride_1",
+      "provider": "agent_rocketride",
+      "config": {
+        "agent_description": "Nous find-slot: Guild Calendar read → propose free slot → FalkorDB + LaserData. Read-only calendar.",
+        "instructions": [
+          "You find one free calendar slot for a commitment. READ calendar only. Never create/update/delete events. Never call create_event.",
+          "Expected input: {correlation_id, commitment_id?, person, window_start, window_end, activity?}.",
+          "1) Validate window_start/window_end ISO-8601; preserve correlation_id and optional commitment_id.",
+          "2) Call tool_guild (nous-calendar-reader) with check_availability for that window. Collect conflicts.",
+          "3) Propose one free slot inside the window that avoids conflicts. Shape proposed_slot as {start, end, person, activity, title} (activity defaults to visit/meet with person).",
+          "4) If commitment_id is present: write proposed_slot onto the Commitment and related Action in FalkorDB personal_brain (allow_writes). Do not invent commitment rows if missing — return failed with reason missing_commitment.",
+          "5) Remember the proposal JSON in LaserData namespace nous:life-events (include correlation_id, commitment_id?, proposed_slot, conflicts, source:find_slot).",
+          "6) Return JSON only:",
+          "{\"status\":\"slot_proposed\",\"proposed_slot\":{...},\"conflicts\":[...],\"correlation_id\":\"...\",\"commitment_id\":\"...\"}"
+        ],
+        "max_waves": 10,
+        "parameters": {}
+      },
+      "input": [
+        {
+          "lane": "questions",
+          "from": "webhook_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 260,
+          "y": 200
+        }
+      }
+    },
+    {
+      "id": "llm_openai_1",
+      "provider": "llm_openai",
+      "config": {
+        "profile": "openai-4o-mini",
+        "openai-4o-mini": {
+          "apikey": "${ROCKETRIDE_OPENAI_KEY}"
+        },
+        "parameters": {}
+      },
+      "control": [
+        {
+          "classType": "llm",
+          "from": "agent_rocketride_1"
+        },
+        {
+          "classType": "llm",
+          "from": "graph_falkordb_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 260,
+          "y": 20
+        }
+      }
+    },
+    {
+      "id": "memory_internal_1",
+      "provider": "memory_internal",
+      "config": {
+        "type": "memory_internal"
+      },
+      "control": [
+        {
+          "classType": "memory",
+          "from": "agent_rocketride_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 260,
+          "y": 380
+        }
+      }
+    },
+    {
+      "id": "tool_guild_1",
+      "provider": "tool_guild",
+      "config": {
+        "type": "tool_guild",
+        "baseUrl": "https://app.guild.ai",
+        "apiKeyId": "${GUILD_API_KEY_ID}",
+        "apiKeySecret": "${GUILD_API_KEY_SECRET}",
+        "owner": "${GUILD_WORKSPACE_OWNER}",
+        "workspace": "${GUILD_WORKSPACE_NAME}",
+        "agent": "nous-calendar-reader",
+        "resultMode": "wait",
+        "timeout": 300,
+        "maxSessions": 5,
+        "verifyTls": true
+      },
+      "control": [
+        {
+          "classType": "tool",
+          "from": "agent_rocketride_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 520,
+          "y": 40
+        }
+      }
+    },
+    {
+      "id": "graph_falkordb_1",
+      "provider": "graph_falkordb",
+      "config": {
+        "type": "graph_falkordb",
+        "host": "${FALKOR_HOST}",
+        "port": 6379,
+        "username": "${FALKOR_USERNAME}",
+        "password": "${FALKOR_PASSWORD}",
+        "tls": false,
+        "graph": "personal_brain",
+        "db_description": "Nous personal brain graph: write proposed_slot onto Commitment/Action when commitment_id present.",
+        "allow_writes": true,
+        "allow_execute": true,
+        "max_attempts": 5,
+        "max_rows": 250,
+        "max_execute_rows": 25000,
+        "query_timeout_ms": 30000
+      },
+      "control": [
+        {
+          "classType": "tool",
+          "from": "agent_rocketride_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 520,
+          "y": 200
+        }
+      }
+    },
+    {
+      "id": "tool_laserdata_memory_1",
+      "provider": "tool_laserdata_memory",
+      "config": {
+        "type": "tool_laserdata_memory",
+        "profile": "cloud",
+        "cloud": {
+          "connection_string": "${LASER_CONNECTION_STRING}",
+          "namespace": "nous:life-events",
+          "show_advanced": true,
+          "stream": "nous",
+          "allow_namespace_override": false,
+          "folded": true,
+          "recall_limit": 20,
+          "op_timeout": 30
+        }
+      },
+      "control": [
+        {
+          "classType": "tool",
+          "from": "agent_rocketride_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 520,
+          "y": 360
+        }
+      }
+    },
+    {
+      "id": "response_answers_1",
+      "provider": "response_answers",
+      "config": {
+        "laneName": "result"
+      },
+      "input": [
+        {
+          "lane": "answers",
+          "from": "agent_rocketride_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 760,
+          "y": 200
+        }
+      }
+    }
+  ],
+  "description": "Guild Calendar read → propose free slot → FalkorDB proposed_slot + LaserData life-events",
+  "project_id": "5e549971-2a03-4ae1-a60f-a13a8308fcf9",
+  "viewport": {
+    "x": 0,
+    "y": 0,
+    "zoom": 1
+  },
+  "version": 1
+}

@@ -1,0 +1,148 @@
+{
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "webhook"
+      },
+      "ui": { "position": { "x": 20, "y": 200 } }
+    },
+    {
+      "id": "agent_rocketride_1",
+      "provider": "agent_rocketride",
+      "config": {
+        "agent_description": "Nous follow-up nudge: FalkorDB due booked commitments → Guild send → receipts. Idempotent.",
+        "instructions": [
+          "Cron/webhook trigger. Input may be {} or {correlation_id?}. Never book calendar.",
+          "1) Query FalkorDB personal_brain for Commitments with status=booked where follow_up_due <= now AND no reply receipt exists for that commitment.",
+          "2) For each candidate: if a nudge Receipt already exists (kind=followup_nudge or action=nudge) for that commitment_id, skip it (idempotent).",
+          "3) For each remaining: send a short nudge via the same send path — channel from commitment.channel or default gmail; call tool_guild_gmail (nous-gmail-writer) or tool_guild_slack (nous-slack-writer) with to=person contact and text like \"Following up on our plans — still good for {booked_slot}?\".",
+          "4) On send success: write Receipt to FalkorDB and LaserData nous:receipts; set commitment.follow_up_sent_at = now ISO-8601; append commitment_id to nudged[].",
+          "5) On send failure: publish failure receipt; do not set follow_up_sent_at; do not invent external_id; list under skipped with reason.",
+          "6) Return JSON only:",
+          "{\"status\":\"ok\",\"nudged\":[{\"commitment_id\":\"...\",\"channel\":\"gmail|slack\"}],\"skipped\":[{\"commitment_id\":\"...\",\"reason\":\"already_nudged|no_reply_pending|send_failed|...\"}],\"correlation_id\":\"...\"}"
+        ],
+        "max_waves": 16,
+        "parameters": {}
+      },
+      "input": [{ "lane": "questions", "from": "webhook_1" }],
+      "ui": { "position": { "x": 260, "y": 200 } }
+    },
+    {
+      "id": "llm_openai_1",
+      "provider": "llm_openai",
+      "config": {
+        "profile": "openai-4o-mini",
+        "openai-4o-mini": { "apikey": "${ROCKETRIDE_OPENAI_KEY}" },
+        "parameters": {}
+      },
+      "control": [
+        { "classType": "llm", "from": "agent_rocketride_1" },
+        { "classType": "llm", "from": "graph_falkordb_1" }
+      ],
+      "ui": { "position": { "x": 260, "y": 20 } }
+    },
+    {
+      "id": "memory_internal_1",
+      "provider": "memory_internal",
+      "config": { "type": "memory_internal" },
+      "control": [{ "classType": "memory", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 260, "y": 380 } }
+    },
+    {
+      "id": "graph_falkordb_1",
+      "provider": "graph_falkordb",
+      "config": {
+        "type": "graph_falkordb",
+        "host": "${FALKOR_HOST}",
+        "port": 6379,
+        "username": "${FALKOR_USERNAME}",
+        "password": "${FALKOR_PASSWORD}",
+        "tls": false,
+        "graph": "personal_brain",
+        "db_description": "Nous personal brain: query booked commitments due for follow-up; write nudge receipts and follow_up_sent_at.",
+        "allow_writes": true,
+        "allow_execute": true,
+        "max_attempts": 5,
+        "max_rows": 250,
+        "max_execute_rows": 25000,
+        "query_timeout_ms": 30000
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 520, "y": 20 } }
+    },
+    {
+      "id": "tool_guild_gmail_1",
+      "provider": "tool_guild",
+      "config": {
+        "type": "tool_guild",
+        "baseUrl": "https://app.guild.ai",
+        "apiKeyId": "${GUILD_API_KEY_ID}",
+        "apiKeySecret": "${GUILD_API_KEY_SECRET}",
+        "owner": "${GUILD_WORKSPACE_OWNER}",
+        "workspace": "${GUILD_WORKSPACE_NAME}",
+        "agent": "nous-gmail-writer",
+        "resultMode": "wait",
+        "timeout": 300,
+        "maxSessions": 3,
+        "verifyTls": true
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 520, "y": 160 } }
+    },
+    {
+      "id": "tool_guild_slack_1",
+      "provider": "tool_guild",
+      "config": {
+        "type": "tool_guild",
+        "baseUrl": "https://app.guild.ai",
+        "apiKeyId": "${GUILD_API_KEY_ID}",
+        "apiKeySecret": "${GUILD_API_KEY_SECRET}",
+        "owner": "${GUILD_WORKSPACE_OWNER}",
+        "workspace": "${GUILD_WORKSPACE_NAME}",
+        "agent": "nous-slack-writer",
+        "resultMode": "wait",
+        "timeout": 300,
+        "maxSessions": 3,
+        "verifyTls": true
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 520, "y": 300 } }
+    },
+    {
+      "id": "tool_laserdata_memory_1",
+      "provider": "tool_laserdata_memory",
+      "config": {
+        "type": "tool_laserdata_memory",
+        "profile": "cloud",
+        "cloud": {
+          "connection_string": "${LASER_CONNECTION_STRING}",
+          "namespace": "nous:receipts",
+          "show_advanced": true,
+          "stream": "nous",
+          "allow_namespace_override": true,
+          "folded": true,
+          "recall_limit": 20,
+          "op_timeout": 30
+        }
+      },
+      "control": [{ "classType": "tool", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 520, "y": 440 } }
+    },
+    {
+      "id": "response_answers_1",
+      "provider": "response_answers",
+      "config": { "laneName": "result" },
+      "input": [{ "lane": "answers", "from": "agent_rocketride_1" }],
+      "ui": { "position": { "x": 760, "y": 200 } }
+    }
+  ],
+  "description": "Cron/webhook → FalkorDB due booked commitments → Guild nudge send → receipts (idempotent)",
+  "project_id": "7e10539a-02fa-4e1a-8b82-9ce5c488c91f",
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "version": 1
+}

@@ -4,3 +4,9 @@ __pycache__/
 *.pyc
 state/
 /nous/
+
+.env
+.env.local
+*.crt
+.env.*.local
+.vercel
